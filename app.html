@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>WEBPERA · Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..700;1,14..32,400..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* ----- WHITE MODERN THEME ----- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #f8fafc;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            color: #1e293b;
+            padding: 0;
+            margin: 0;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 20px 16px 32px;
+        }
+
+        /* ----- APP HEADER (elevated) ----- */
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0,0,0,0.02);
+            margin-bottom: 24px;
+            border: 1px solid rgba(0,0,0,0.02);
+        }
+
+        .app-header .logo {
+            font-weight: 700;
+            font-size: 1.5rem;
+            letter-spacing: -0.5px;
+            background: linear-gradient(135deg, #2563eb, #0f2b5e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .credits-box {
+            text-align: right;
+        }
+
+        .credits-box .total {
+            background: #eef2ff;
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #2563eb;
+            border: 1px solid #dbeafe;
+            display: inline-block;
+            box-shadow: 0 2px 4px rgba(37,99,235,0.1);
+        }
+
+        .credits-box .total.low {
+            background: #fff7ed;
+            color: #c2410c;
+            border-color: #fed7aa;
+        }
+
+        .credits-box .total.critical {
+            background: #fef2f2;
+            color: #b91c1c;
+            border-color: #fecaca;
+        }
+
+        .credits-box .daily {
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        .logout-btn {
+            background: white;
+            border: 1px solid #e2e8f0;
+            color: #475569;
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+        }
+
+        .logout-btn:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            color: #0f172a;
+        }
+
+        /* ----- USB STATUS CARD (modern) ----- */
+        .usb-status-card {
+            background: white;
+            border-radius: 24px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 25px -10px rgba(0,0,0,0.1);
+            border: 1px solid rgba(0,0,0,0.02);
+            transition: all 0.2s;
+        }
+
+        .usb-status-card.connected {
+            box-shadow: 0 10px 25px -8px #22c55e40;
+        }
+
+        .usb-status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .usb-status-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .usb-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #ef4444;
+            box-shadow: 0 0 0 3px #fee2e2;
+        }
+
+        .usb-dot.connected {
+            background: #22c55e;
+            box-shadow: 0 0 0 3px #dcfce7;
+        }
+
+        .usb-dot.reconnecting {
+            background: #f97316;
+            box-shadow: 0 0 0 3px #ffedd5;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 3px #ffedd5; }
+            50% { box-shadow: 0 0 0 6px #ffedd5; opacity: 0.7; }
+        }
+
+        .usb-status-text {
+            font-weight: 600;
+            font-size: 1rem;
+            color: #1e293b;
+        }
+
+        .usb-status-sub {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 2px;
+        }
+
+        .usb-signal {
+            background: #f1f5f9;
+            padding: 6px 12px;
+            border-radius: 40px;
+            font-size: 0.7rem;
+            color: #334155;
+            font-weight: 500;
+        }
+
+        /* ----- CARD (white, soft) ----- */
+        .card {
+            background: white;
+            border-radius: 24px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 25px -12px rgba(0,0,0,0.1);
+            border: 1px solid rgba(0,0,0,0.02);
+        }
+
+        .card h3 {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 12px;
+        }
+
+        /* form elements */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #475569;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 14px 16px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            color: #0f172a;
+            transition: all 0.15s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: #2563eb;
+            outline: none;
+            box-shadow: 0 0 0 4px #dbeafe;
+            background: white;
+        }
+
+        .row {
+            display: flex;
+            gap: 16px;
+        }
+
+        .half {
+            flex: 1;
+        }
+
+        /* ----- BUTTON ROW (elegant) ----- */
+        .button-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .button-row button {
+            flex: 1;
+            padding: 18px 10px;
+            border-radius: 30px;
+            font-weight: 600;
+            font-size: 0.95rem;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'Inter', sans-serif;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.02);
+        }
+
+        .btn-usb {
+            background: #2563eb;
+            color: white;
+            box-shadow: 0 12px 20px -14px #2563eb;
+        }
+
+        .btn-usb:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
+        }
+
+        .btn-usb.connected {
+            background: #22c55e;
+            box-shadow: 0 12px 20px -14px #22c55e;
+        }
+
+        .btn-usb.reconnecting {
+            background: #f97316;
+            box-shadow: 0 12px 20px -14px #f97316;
+            animation: softBlink 1.2s infinite;
+        }
+
+        @keyframes softBlink {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; background: #fb923c; }
+        }
+
+        .btn-server {
+            background: #e2e8f0;
+            color: #64748b;
+            cursor: default;
+        }
+
+        .btn-server.ready {
+            background: #2563eb;
+            color: white;
+            box-shadow: 0 12px 20px -14px #2563eb;
+            cursor: pointer;
+        }
+
+        .btn-server.ready:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
+        }
+
+        .btn-server.running {
+            background: #ef4444;
+            color: white;
+            box-shadow: 0 12px 20px -14px #ef4444;
+            cursor: pointer;
+        }
+
+        .btn-server.running:hover {
+            background: #dc2626;
+        }
+
+        /* ----- SERVER STATUS (minimal) ----- */
+        .server-status {
+            background: #f8fafc;
+            border-radius: 40px;
+            padding: 16px 24px;
+            margin-bottom: 24px;
+            text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+
+        .server-status .status-text {
+            font-weight: 500;
+            color: #475569;
+        }
+
+        .server-status.running .status-text {
+            color: #22c55e;
+            font-weight: 600;
+        }
+
+        /* ----- LOG BOX (clean) ----- */
+        .log-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 20px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: 'Menlo', 'Consolas', monospace;
+            font-size: 0.8rem;
+            color: #1e293b;
+            margin-top: 12px;
+        }
+
+        .log-entry {
+            padding: 6px 0;
+            border-bottom: 1px solid #e2e8f0;
+            color: #334155;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-entry.success { color: #16a34a; }
+        .log-entry.warning { color: #ea580c; }
+        .log-entry.error { color: #dc2626; }
+        .log-entry.info { color: #2563eb; }
+        .log-entry.credit { color: #16a34a; font-weight: 600; }
+        .log-entry .time { color: #94a3b8; margin-right: 12px; }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 6px;
+        }
+
+        .btn-small {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            padding: 8px 18px;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #334155;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn-small:hover {
+            background: #e2e8f0;
+        }
+
+        /* toast notification */
+        .credit-toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            color: #0f172a;
+            padding: 14px 30px;
+            border-radius: 60px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            box-shadow: 0 20px 35px -10px rgba(0,0,0,0.2);
+            border: 1px solid #e2e8f0;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+
+        .credit-toast.show {
+            opacity: 1;
+        }
+
+        .credit-toast.error { background: #ef4444; color: white; border: none; }
+        .credit-toast.warning { background: #f97316; color: white; border: none; }
+
+        /* blackout overlay */
+        .blackout {
+            position: fixed;
+            inset: 0;
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(8px);
+            z-index: 9999;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .blackout.active {
+            display: flex;
+        }
+
+        .blackout-msg {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+
+        .blackout-sub {
+            color: #475569;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Blackout -->
+    <div class="blackout" id="blackout">
+        <div class="blackout-msg">📡 No Internet Connection</div>
+        <div class="blackout-sub">Please connect to continue</div>
+    </div>
+
+    <!-- Toast -->
+    <div class="credit-toast" id="creditToast">💳 Credit Used</div>
+
+    <div class="container">
+        <!-- App Header -->
+        <div class="app-header">
+            <div class="logo">WEBPERA</div>
+            <div class="user-info">
+                <div class="credits-box">
+                    <div class="total" id="creditsDisplay">Credits: --</div>
+                    <div class="daily" id="dailyDisplay">Today: --/--</div>
+                </div>
+                <button class="logout-btn" onclick="logout()">Logout</button>
+            </div>
+        </div>
+
+        <!-- USB Status Card -->
+        <div class="usb-status-card" id="usbStatusCard">
+            <div class="usb-status-row">
+                <div class="usb-status-left">
+                    <div class="usb-dot" id="usbDot"></div>
+                    <div>
+                        <div class="usb-status-text" id="usbStatusText">USB Not Connected</div>
+                        <div class="usb-status-sub" id="usbStatusSub">Connect USB cable</div>
+                    </div>
+                </div>
+                <div class="usb-status-right">
+                    <div class="usb-signal" id="usbSignal">—</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Meter Config Card -->
+        <div class="card" id="configPanel">
+            <h3>⚙️ Meter Configuration</h3>
+            
+            <div class="form-group">
+                <label>Meter Profile</label>
+                <select id="meterSelect">
+                    <option value="avon">Avon Single Phase</option>
+                    <option value="avon2">Avon 2 (New Model)</option>
+                    <option value="genus">Genus Three Phase</option>
+                    <option value="mt">MT Three Phase</option>
+                    <option value="hpl">HPL Single Phase</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label>Serial No (Name Plate)</label>
+                <input type="text" id="val_serial" value="73300141" placeholder="e.g. 73300141">
+            </div>
+
+            <div class="row">
+                <div class="form-group half">
+                    <label>Current kWh</label>
+                    <input type="number" id="val_kwh" value="1234.5" step="0.1">
+                </div>
+                <div class="form-group half">
+                    <label>Current kVAh</label>
+                    <input type="number" id="val_kvah" value="1300.0" step="0.1">
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="form-group half">
+                    <label>MD (kW)</label>
+                    <input type="number" id="val_md_kw" value="5.5" step="0.1">
+                </div>
+                <div class="form-group half">
+                    <label>MD (kVA)</label>
+                    <input type="number" id="val_md_kva" value="5.8" step="0.1">
+                </div>
+            </div>
+        </div>
+
+        <!-- Two Action Buttons -->
+        <div class="button-row">
+            <button id="btnUsb" class="btn-usb" onclick="toggleUsb()">🔌 CONNECT USB</button>
+            <button id="btnServer" class="btn-server" onclick="toggleServer()">▶️ START SERVER</button>
+        </div>
+
+        <!-- Server Status -->
+        <div class="server-status" id="serverStatus">
+            <div class="status-text" id="serverStatusText">Server Stopped</div>
+        </div>
+
+        <!-- Log Box -->
+        <div class="card">
+            <div class="log-header">
+                <h3>📄 Status Log</h3>
+                <button class="btn-small" onclick="clearLogs()">Clear</button>
+            </div>
+            <div id="logBox" class="log-box">
+                <div class="log-entry info"><span class="time">[--:--]</span> System Ready. Connect USB.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase & scripts (keep as is) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+    <script src="js/net-guard.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="meters/avon.js"></script>
+    <script src="meters/avon2.js"></script>
+    <script src="meters/mt_profile.js"></script>
+    <script src="js/logic.js"></script>
+    <script src="js/logic_avon2.js"></script>
+    <script src="js/logic_mt.js"></script>
+    <script src="meters/hpl.js"></script>
+    <script src="js/logic_hpl.js"></script>
+    <script src="meters/genus.js"></script>
+    <script src="js/logic_genus.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/web.js"></script>
+</body>
+</html>
