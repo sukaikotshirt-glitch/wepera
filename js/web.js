@@ -161,6 +161,10 @@ function showToast(message, type = 'success') {
 async function logout() {
     stopUsbHealthCheck();
     try {
+        // अगर USB connected है तो उसे disconnect करें
+        if (isUsbConnected) {
+            try { Android.disconnect(); } catch(e) {}
+        }
         await auth.signOut();
         window.location.href = 'index.html';
     } catch (error) {
@@ -168,7 +172,7 @@ async function logout() {
     }
 }
 
-// ========== USB FUNCTIONS (SIMULATED FOR BROWSER) ==========
+// ========== USB FUNCTIONS ==========
 function toggleUsb() {
     if (isReconnecting) {
         log('⏳ Reconnection in progress...', 'warning');
@@ -186,13 +190,19 @@ function connectUsb() {
     log('🔌 Connecting USB...', 'info');
     updateUsbStatus('connecting');
     
-    // सिम्युलेटेड कनेक्शन - 2 सेकंड बाद कनेक्ट हो जाएगा
-    setTimeout(() => {
-        // कनेक्शन सफल
-        onConnected("USB Connected Successfully");
-        log('✅ USB Connected (Simulated)', 'success');
-        showToast('USB Connected', 'success');
-    }, 2000);
+    try {
+        // Android native method call
+        if (typeof Android !== 'undefined' && Android.connectUSB) {
+            Android.connectUSB();
+        } else {
+            log('❌ Android bridge not available', 'error');
+            updateUsbStatus('disconnected');
+            showToast('USB not available in browser', 'error');
+        }
+    } catch(e) {
+        log('❌ USB connection failed', 'error');
+        updateUsbStatus('disconnected');
+    }
 }
 
 function disconnectUsb() {
@@ -202,13 +212,18 @@ function disconnectUsb() {
     
     stopUsbHealthCheck();
     
+    try {
+        if (typeof Android !== 'undefined' && Android.disconnect) {
+            Android.disconnect();
+        }
+    } catch(e) {}
+    
     isUsbConnected = false;
     isReconnecting = false;
     reconnectAttempts = 0;
     updateUsbStatus('disconnected');
     updateServerButton();
     log('🔌 USB Disconnected', 'warning');
-    showToast('USB Disconnected', 'warning');
 }
 
 function updateUsbStatus(status) {
@@ -230,7 +245,7 @@ function updateUsbStatus(status) {
             btn.classList.add('connected');
             text.textContent = '✅ USB Connected';
             sub.textContent = 'CH340 Serial • 9600 baud';
-            signal.textContent = '● Strong';
+            signal.textContent = '● Active';
             signal.style.color = '#22c55e';
             btn.textContent = '🔌 DISCONNECT USB';
             break;
@@ -255,8 +270,10 @@ function updateUsbStatus(status) {
             
         case 'disconnected':
         default:
+            card.classList.remove('connected', 'reconnecting');
+            dot.classList.remove('connected', 'reconnecting');
             text.textContent = '❌ USB Not Connected';
-            sub.textContent = 'Connect USB cable to begin';
+            sub.textContent = 'Connect USB OTG cable to begin';
             signal.textContent = '—';
             btn.textContent = '🔌 CONNECT USB';
             break;
@@ -265,18 +282,16 @@ function updateUsbStatus(status) {
 
 // ========== USB HEALTH CHECK ==========
 function startUsbHealthCheck() {
-    stopUsbHealthCheck(); // Clear any existing
+    stopUsbHealthCheck();
     
     lastDataTime = Date.now();
     
     usbHealthCheckInterval = setInterval(() => {
         if (!isUsbConnected || !isServerRunning) return;
         
-        // Check if we received data recently (within 30 sec during active session)
         const timeSinceData = Date.now() - lastDataTime;
-        
-        // Update signal indicator
         const signal = document.getElementById('usbSignal');
+        
         if (timeSinceData < 5000) {
             signal.textContent = '● Active';
             signal.style.color = '#22c55e';
@@ -315,13 +330,14 @@ function attemptReconnect() {
     log(`🔄 Reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`, 'warning');
     
     setTimeout(() => {
-        // सिम्युलेटेड रीकनेक्ट
-        if (reconnectAttempts <= 3) {
-            onConnected("Reconnected");
-        } else {
-            onUsbError("Connection failed");
+        try {
+            if (typeof Android !== 'undefined' && Android.connectUSB) {
+                Android.connectUSB();
+            }
+        } catch(e) {
+            onUsbError("Reconnection failed");
         }
-    }, 1000);
+    }, 2000);
 }
 
 // ========== SERVER FUNCTIONS ==========
@@ -362,7 +378,10 @@ function startServer() {
         CurrentLogic = Logic_MT;
     }
 
-    CurrentLogic.init();
+    if (CurrentLogic && CurrentLogic.init) {
+        CurrentLogic.init();
+    }
+    
     updateUIValues();
 
     isServerRunning = true;
@@ -374,44 +393,6 @@ function startServer() {
     const meterName = meterType.toUpperCase();
     log(`▶️ Server Started (${meterName})`, 'success');
     log('📡 Waiting for meter reading request...', 'info');
-    
-    // सिम्युलेटेड डेटा रिसीव - टेस्टिंग के लिए
-    setTimeout(() => {
-        if (isServerRunning) {
-            simulateMeterReading();
-        }
-    }, 3000);
-}
-
-// सिम्युलेटेड मीटर रीडिंग - टेस्टिंग के लिए
-function simulateMeterReading() {
-    // कनेक्शन रिक्वेस्ट
-    onDataReceived("935A64");
-    
-    setTimeout(() => {
-        // ऑथेंटिकेशन
-        onDataReceived("A041034110");
-    }, 1000);
-    
-    setTimeout(() => {
-        // सीरियल रीडिंग
-        onDataReceived("0100600100");
-    }, 2000);
-    
-    setTimeout(() => {
-        // बिलिंग डेटा - क्रेडिट कटेगा
-        onDataReceived("0201020204");
-    }, 3000);
-    
-    setTimeout(() => {
-        // इंस्टेंट वैल्यू
-        onDataReceived("0100010700");
-    }, 4000);
-    
-    setTimeout(() => {
-        // रीडिंग कम्प्लीट
-        onDataReceived("5356A2");
-    }, 5000);
 }
 
 function stopServer() {
@@ -431,6 +412,7 @@ function updateServerButton() {
 
     if (!isUsbConnected) {
         btn.textContent = '▶️ START SERVER';
+        btn.classList.remove('ready', 'running');
     } else if (isServerRunning) {
         btn.textContent = '⏹️ STOP SERVER';
         btn.classList.add('running');
@@ -460,6 +442,9 @@ function lockConfig(lock) {
 }
 
 function updateUIValues() {
+    if (!CurrentLogic) return;
+    
+    CurrentLogic.uiValues = CurrentLogic.uiValues || {};
     CurrentLogic.uiValues.serial = document.getElementById('val_serial').value || "0000000";
     CurrentLogic.uiValues.kwh = parseFloat(document.getElementById('val_kwh').value) || 0;
     CurrentLogic.uiValues.kvah = parseFloat(document.getElementById('val_kvah').value) || 0;
@@ -470,6 +455,8 @@ function updateUIValues() {
 // ========== LOGGING ==========
 function log(msg, type = '') {
     const box = document.getElementById('logBox');
+    if (!box) return;
+    
     const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
     
     const entry = document.createElement('div');
@@ -479,20 +466,23 @@ function log(msg, type = '') {
     box.appendChild(entry);
     box.scrollTop = box.scrollHeight;
     
-    // Keep only last 100 entries
     while (box.children.length > 100) {
         box.removeChild(box.firstChild);
     }
 }
 
 function clearLogs() {
-    document.getElementById('logBox').innerHTML = '';
-    log('📜 Logs cleared', 'info');
+    const box = document.getElementById('logBox');
+    if (box) {
+        box.innerHTML = '';
+        log('📜 Logs cleared', 'info');
+    }
 }
 
-// ========== CALLBACKS (SIMULATED FOR BROWSER) ==========
+// ========== ANDROID CALLBACKS ==========
+// ये functions Android native code से call होंगे
 
-// ✅ USB Connected Successfully
+// ✅ USB Connected Successfully - यह तभी call होगा जब असली USB OTG कनेक्ट हो
 function onConnected(message) {
     isUsbConnected = true;
     isReconnecting = false;
@@ -500,14 +490,18 @@ function onConnected(message) {
     updateUsbStatus('connected');
     updateServerButton();
     log('✅ USB Connected Successfully', 'success');
+    showToast('USB Connected', 'success');
+    
+    // वाइब्रेट करें (अगर available हो)
+    try { if (typeof Android !== 'undefined' && Android.vibrate) Android.vibrate(100); } catch(e) {}
 }
 
-// ✅ USB Attached (Plugged in)
+// ✅ USB Attached (Plugged in) - जब USB OTG केबल लगाई जाए
 function onUsbAttached() {
-    log('🔌 USB Cable Detected', 'info');
+    log('🔌 USB OTG Cable Detected', 'info');
     showToast('USB Detected - Connecting...', 'success');
     
-    // Auto connect
+    // ऑटो-कनेक्ट
     setTimeout(() => {
         if (!isUsbConnected) {
             connectUsb();
@@ -515,9 +509,9 @@ function onUsbAttached() {
     }, 500);
 }
 
-// ✅ USB Detached (Unplugged)
+// ✅ USB Detached (Unplugged) - जब USB OTG केबल हटाई जाए
 function onUsbDetached() {
-    log('⚠️ USB Cable Disconnected!', 'error');
+    log('⚠️ USB OTG Cable Disconnected!', 'error');
     showToast('USB Disconnected!', 'error');
     
     const wasRunning = isServerRunning;
@@ -529,6 +523,9 @@ function onUsbDetached() {
     updateServerStatus();
     stopUsbHealthCheck();
     
+    // वाइब्रेट करें
+    try { if (typeof Android !== 'undefined' && Android.vibrate) Android.vibrate(200); } catch(e) {}
+    
     if (wasRunning) {
         log('⏹️ Server stopped due to USB disconnect', 'warning');
     }
@@ -539,16 +536,13 @@ function onUsbError(errorMessage) {
     log(`❌ USB Error: ${errorMessage}`, 'error');
     
     if (isUsbConnected && !isReconnecting) {
-        // Connection lost, try to reconnect
         isUsbConnected = false;
         attemptReconnect();
     } else if (isReconnecting) {
-        // Reconnect attempt failed, try again
         setTimeout(attemptReconnect, 2000);
     } else {
-        // Initial connection failed
         updateUsbStatus('disconnected');
-        showToast('USB Connection Failed - ' + errorMessage, 'error');
+        showToast('USB Connection Failed', 'error');
     }
 }
 
@@ -563,10 +557,9 @@ function onUsbPermissionDenied() {
 function onDataReceived(hexData) {
     if (!isServerRunning) return;
     
-    // Update last data time for health check
     lastDataTime = Date.now();
 
-    // Detect request type and show simple status
+    // Detect request type
     if (hexData.includes("935A64")) {
         log('🔄 Connection request received...', 'info');
     } else if (hexData.includes("A041034110") || hexData.includes("A044034110")) {
@@ -578,6 +571,7 @@ function onDataReceived(hexData) {
     } else if (hexData.includes("0201020204")) {
         log('📊 Reading billing data...', 'info');
         
+        // क्रेडिट deduct करें
         if (!creditDeductedThisSession) {
             const success = deductCredit();
             if (success !== false) {
@@ -588,19 +582,25 @@ function onDataReceived(hexData) {
         log('📊 Reading instant values...', 'info');
     } else if (hexData.includes("5356A2")) {
         log('✅ Reading Complete!', 'success');
+        // वाइब्रेट करें
+        try { if (typeof Android !== 'undefined' && Android.vibrate) Android.vibrate(100); } catch(e) {}
     }
 
     // Process and send response
-    const reply = CurrentLogic.processPacket(hexData);
-    if (reply) {
-        setTimeout(() => {
-            try {
-                // सिम्युलेटेड रिस्पॉन्स
-                log(`📤 Response sent: ${reply.substring(0, 20)}...`, 'info');
-            } catch(e) {
-                log('❌ Failed to send response', 'error');
-            }
-        }, 50);
+    if (CurrentLogic && CurrentLogic.processPacket) {
+        const reply = CurrentLogic.processPacket(hexData);
+        if (reply) {
+            setTimeout(() => {
+                try {
+                    if (typeof Android !== 'undefined' && Android.sendData) {
+                        Android.sendData(reply);
+                        log(`📤 Response sent`, 'info');
+                    }
+                } catch(e) {
+                    log('❌ Failed to send response', 'error');
+                }
+            }, 50);
+        }
     }
 }
 
@@ -617,12 +617,26 @@ function onLog(message) {
 
 // ========== INIT ==========
 window.onload = function() {
-    CurrentLogic = Logic;
-    CurrentLogic.init();
+    if (typeof Logic !== 'undefined') {
+        CurrentLogic = Logic;
+        if (CurrentLogic.init) {
+            CurrentLogic.init();
+        }
+    }
+    
     updateUsbStatus('disconnected');
     updateServerStatus();
-    initNetGuard();
+    
+    if (typeof initNetGuard === 'function') {
+        initNetGuard();
+    }
     
     log('🚀 WEBPERA Ready to use', 'success');
-    log('📱 Connect USB cable to begin', 'info');
+    log('📱 Connect USB OTG cable to begin', 'info');
+    
+    // चेक करें कि Android ब्रिज उपलब्ध है या नहीं
+    if (typeof Android === 'undefined') {
+        log('⚠️ Running in browser mode - USB will not work', 'warning');
+        log('📱 Please use Android app for USB connectivity', 'warning');
+    }
 };
