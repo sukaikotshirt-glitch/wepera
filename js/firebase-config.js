@@ -1,10 +1,10 @@
-// ✅ YEH SAHI HAI?
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-    apiKey: "AIzaSyBwQ5tng6BUabgwRgGFUbXIuxoOxkKP5rs",
-    authDomain: "emitra-7e8e2.firebaseapp.com",
-    projectId: "emitra-7e8e2",
-    storageBucket: "emitra-7e8e2.firebasestorage.app",
-    messagingSenderId: "401639796008",
-    appId: "1:401639796008:web:99c282c261ba226259741d",
-    measurementId: "G-8XMM6X9YZC"
+  apiKey: "AIzaSyDlgxQFeSvapABuxo7nAgZwiJrn_gMpvHk",
+  authDomain: "webpera-4b393.firebaseapp.com",
+  projectId: "webpera-4b393",
+  storageBucket: "webpera-4b393.firebasestorage.app",
+  messagingSenderId: "845796014673",
+  appId: "1:845796014673:web:7b584501261a7c4a0e9670",
+  measurementId: "G-M6BJ51RQ05"
 };
