@@ -25,7 +25,6 @@
             line-height: 1.5;
         }
 
-        /* Minimal abstract background */
         .bg-shape {
             position: fixed;
             width: 100%;
@@ -45,7 +44,6 @@
             z-index: 10;
         }
 
-        /* White card with soft shadow */
         .login-card {
             background: white;
             border-radius: 40px;
@@ -54,7 +52,6 @@
             backdrop-filter: blur(2px);
         }
 
-        /* Logo / robot area */
         .logo-header {
             text-align: center;
             margin-bottom: 32px;
@@ -95,7 +92,6 @@
             letter-spacing: 2px;
         }
 
-        /* error */
         .error-msg {
             background: #fef2f2;
             color: #b91c1c;
@@ -113,7 +109,6 @@
             display: block;
         }
 
-        /* form */
         .form-group {
             margin-bottom: 24px;
         }
@@ -170,7 +165,6 @@
             font-weight: 300;
         }
 
-        /* button */
         .login-btn {
             width: 100%;
             padding: 18px 20px;
@@ -229,7 +223,6 @@
             to { transform: rotate(360deg); }
         }
 
-        /* footer */
         .login-footer {
             text-align: center;
             margin-top: 28px;
@@ -242,7 +235,6 @@
             font-weight: 600;
         }
 
-        /* connection status */
         .connection-status {
             position: fixed;
             top: 20px;
@@ -269,7 +261,6 @@
             box-shadow: 0 0 0 3px #dcfce7;
         }
 
-        /* blackout */
         .blackout {
             position: fixed;
             inset: 0;
@@ -301,13 +292,11 @@
 <body>
     <div class="bg-shape"></div>
 
-    <!-- Connection Status -->
     <div class="connection-status">
         <div class="connection-dot"></div>
         <span>Online</span>
     </div>
 
-    <!-- Blackout -->
     <div class="blackout" id="blackout">
         <div class="blackout-msg">📡 No Internet</div>
         <div class="blackout-sub">Please connect to continue</div>
@@ -354,18 +343,23 @@
         </div>
     </div>
 
-    <!-- Firebase SDK (same as before) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+	
+	<!-- Firebase Config -->
     <script src="js/firebase-config.js"></script>
+
+    <!-- Net Guard -->
     <script src="js/net-guard.js"></script>
+	
     <script>
-        // Firebase init (copied from your original)
+        // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
 
+        // Check if already logged in
         auth.onAuthStateChanged(async (user) => {
             if (user) {
                 const hasCredits = await checkCredits(user.uid);
@@ -378,6 +372,7 @@
             }
         });
 
+        // Handle Login
         async function handleLogin(e) {
             e.preventDefault();
             
@@ -419,39 +414,47 @@
             }
         }
 
+        // Check if user has credits
         async function checkCredits(uid) {
             try {
                 const doc = await db.collection('users').doc(uid).get();
+                
                 if (doc.exists) {
-                    return doc.data().credits > 0;
+                    const data = doc.data();
+                    return data.credits > 0;
                 }
+                
                 return false;
             } catch (error) {
+                console.error('Credit check error:', error);
                 return false;
             }
         }
 
+        // Show error message
         function showError(msg) {
             const errorDiv = document.getElementById('errorMsg');
             errorDiv.textContent = '❌ ' + msg;
             errorDiv.classList.add('show');
         }
 
+        // Hide error message
         function hideError() {
             document.getElementById('errorMsg').classList.remove('show');
         }
 
-        // Connection status
+        // Update connection status
         window.addEventListener('online', () => {
-            document.querySelector('.connection-dot').style.background = '#22c55e';
+            document.querySelector('.connection-dot').style.background = '#00e676';
             document.querySelector('.connection-status span').textContent = 'Online';
         });
 
         window.addEventListener('offline', () => {
-            document.querySelector('.connection-dot').style.background = '#ef4444';
+            document.querySelector('.connection-dot').style.background = '#d50000';
             document.querySelector('.connection-status span').textContent = 'Offline';
         });
 
+        // Initialize net guard
         initNetGuard();
     </script>
 </body>
