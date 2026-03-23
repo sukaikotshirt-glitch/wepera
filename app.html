@@ -506,16 +506,19 @@
                 <label>Meter Profile</label>
                 <select id="meterSelect">
                     <option value="avon">Avon Single Phase</option>
-                    <option value="avon2">Avon 2 (New Model)</option>
-                    <option value="genus">Genus Three Phase</option>
-                    <option value="mt">MT Three Phase</option>
-                    <option value="hpl">HPL Single Phase</option>
+                    <option value="avon2">Avon 2</option>
+                    <option value="genus">Genus</option>
+                    <option value="mt">MT</option>
+                    <option value="hpl">HPL</option>
+					<option value="hpl">Bantak</option>
+					<option value="hpl">Capital</option>
+					<option value="hpl">LNT</option>
                 </select>
             </div>
 
             <div class="form-group">
                 <label>Serial No (Name Plate)</label>
-                <input type="text" id="val_serial" value="" placeholder="e.g. 902345678">
+                <input type="text" id="val_serial" value="" placeholder="e.g. 9023456">
             </div>
 
             <div class="row">
@@ -586,6 +589,12 @@
     <script src="js/logic_hpl.js"></script>
     <script src="meters/genus.js"></script>
     <script src="js/logic_genus.js"></script>
+	<script src="meters/bantek.js"></script>
+	<script src="js/logic_bantek.js"></script>
+	<script src="meters/capital.js"></script>
+	<script src="js/logic_capital.js"></script>
+	<script src="meters/lnt.js"></script>
+	<script src="js/logic_lnt.js"></script>
 
     <!-- Auth Handler -->
     <script src="js/auth.js"></script>
@@ -955,6 +964,15 @@
                 CurrentLogic = Logic_Genus;
             } else {
                 CurrentLogic = Logic_MT;
+            }
+			else {
+                CurrentLogic = logic_bantek;
+            }
+			else {
+                CurrentLogic = logic_capital;
+            }
+			else {
+                CurrentLogic = logic_lnt;
             }
 
             CurrentLogic.init();
