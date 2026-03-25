@@ -3,12 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>WEBPERA · Dashboard</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..700;1,14..32,400..700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
-    <style>
+    <title>WEBPERA</title>
+    <link rel="stylesheet" href="css/style.css">
+	<link rel="stylesheet" href="css/apk.css">
+	<style>
         /* ----- WHITE MODERN THEME ----- */
         * {
             margin: 0;
@@ -460,19 +458,19 @@
     </style>
 </head>
 <body>
-    <!-- Blackout -->
+    <!-- Black screen overlay for no internet -->
     <div class="blackout" id="blackout">
         <div class="blackout-msg">📡 No Internet Connection</div>
-        <div class="blackout-sub">Please connect to continue</div>
+        <div class="blackout-sub">Please connect to internet to continue</div>
     </div>
 
-    <!-- Toast -->
+    <!-- Toast notification -->
     <div class="credit-toast" id="creditToast">💳 Credit Used</div>
 
     <div class="container">
-        <!-- App Header -->
+        <!-- App Header with Credits -->
         <div class="app-header">
-            <div class="logo">WEBPERA</div>
+            <div class="logo">⚡ WEBPERA</div>
             <div class="user-info">
                 <div class="credits-box">
                     <div class="total" id="creditsDisplay">Credits: --</div>
@@ -489,36 +487,33 @@
                     <div class="usb-dot" id="usbDot"></div>
                     <div>
                         <div class="usb-status-text" id="usbStatusText">USB Not Connected</div>
-                        <div class="usb-status-sub" id="usbStatusSub">Connect USB cable</div>
+                        <div class="usb-status-sub" id="usbStatusSub">Connect USB cable to begin</div>
                     </div>
                 </div>
                 <div class="usb-status-right">
-                    <div class="usb-signal" id="usbSignal">—</div>
+                    <div class="usb-signal" id="usbSignal"></div>
                 </div>
             </div>
         </div>
 
-        <!-- Meter Config Card -->
+        <!-- Meter Configuration -->
         <div class="card" id="configPanel">
-            <h3>⚙️ Meter Configuration</h3>
+            <h3>🛠️ METER CONFIGURATION</h3>
             
             <div class="form-group">
-                <label>Meter Profile</label>
+                <label>Select Meter Profile</label>
                 <select id="meterSelect">
                     <option value="avon">Avon Single Phase</option>
-                    <option value="avon2">Avon 2</option>
-                    <option value="genus">Genus</option>
-                    <option value="mt">MT</option>
-                    <option value="hpl">HPL</option>
-					<option value="hpl">Bantak</option>
-					<option value="hpl">Capital</option>
-					<option value="hpl">LNT</option>
+                    <option value="avon2">Avon 2 (New Model)</option>
+                    <option value="genus">Genus Three Phase</option>
+                    <option value="mt">MT Three Phase</option>
+                    <option value="hpl">HPL Single Phase</option>
                 </select>
             </div>
 
             <div class="form-group">
-                <label>Serial No (Name Plate)</label>
-                <input type="text" id="val_serial" value="" placeholder="e.g. 9023456">
+                <label>Meter Serial No (Name Plate)</label>
+                <input type="text" id="val_serial" value="73300141" placeholder="e.g. 73300141">
             </div>
 
             <div class="row">
@@ -535,19 +530,23 @@
             <div class="row">
                 <div class="form-group half">
                     <label>MD (kW)</label>
-                    <input type="number" id="val_md_kw" value="1.2" step="0.1">
+                    <input type="number" id="val_md_kw" value="5.5" step="0.1">
                 </div>
                 <div class="form-group half">
                     <label>MD (kVA)</label>
-                    <input type="number" id="val_md_kva" value="1.8" step="0.1">
+                    <input type="number" id="val_md_kva" value="5.8" step="0.1">
                 </div>
             </div>
         </div>
 
-        <!-- Two Action Buttons -->
+        <!-- Two Buttons -->
         <div class="button-row">
-            <button id="btnUsb" class="btn-usb" onclick="toggleUsb()">🔌 CONNECT USB</button>
-            <button id="btnServer" class="btn-server" onclick="toggleServer()">▶️ START SERVER</button>
+            <button id="btnUsb" class="btn-usb" onclick="toggleUsb()">
+                🔌 CONNECT USB
+            </button>
+            <button id="btnServer" class="btn-server" onclick="toggleServer()">
+                ▶️ START SERVER
+            </button>
         </div>
 
         <!-- Server Status -->
@@ -555,23 +554,24 @@
             <div class="status-text" id="serverStatusText">Server Stopped</div>
         </div>
 
-        <!-- Log Box -->
+        <!-- Clean Log Box -->
         <div class="card">
             <div class="log-header">
-                <h3>📄 Status Log</h3>
+                <h3>📜 STATUS LOG</h3>
                 <button class="btn-small" onclick="clearLogs()">Clear</button>
             </div>
             <div id="logBox" class="log-box">
-                <div class="log-entry info"><span class="time">[--:--]</span> System Ready. Connect USB.</div>
+                <div class="log-entry info"><span class="time">[--:--]</span> System Ready. Connect USB to begin.</div>
             </div>
         </div>
     </div>
 
-    <!-- Firebase & scripts (keep as is) -->
+    <!-- Firebase SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-   <!-- Firebase Config -->
+
+    <!-- Firebase Config -->
     <script src="js/firebase-config.js"></script>
 
     <!-- Net Guard -->
@@ -589,12 +589,6 @@
     <script src="js/logic_hpl.js"></script>
     <script src="meters/genus.js"></script>
     <script src="js/logic_genus.js"></script>
-	<script src="meters/bantek.js"></script>
-	<script src="js/logic_bantek.js"></script>
-	<script src="meters/capital.js"></script>
-	<script src="js/logic_capital.js"></script>
-	<script src="meters/lnt.js"></script>
-	<script src="js/logic_lnt.js"></script>
 
     <!-- Auth Handler -->
     <script src="js/auth.js"></script>
@@ -615,7 +609,7 @@
         let lastDataTime = 0;
         let usbHealthCheckInterval = null;
         let reconnectAttempts = 0;
-        const MAX_RECONNECT_ATTEMPTS = 3;
+        const MAX_RECONNECT_ATTEMPTS = 5;
 
         // Default = AVON
         var CurrentLogic = Logic;
@@ -964,15 +958,6 @@
                 CurrentLogic = Logic_Genus;
             } else {
                 CurrentLogic = Logic_MT;
-            }
-			else {
-                CurrentLogic = logic_bantek;
-            }
-			else {
-                CurrentLogic = logic_capital;
-            }
-			else {
-                CurrentLogic = logic_lnt;
             }
 
             CurrentLogic.init();
