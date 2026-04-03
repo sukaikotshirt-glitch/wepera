@@ -513,7 +513,7 @@
 
             <div class="form-group">
                 <label>Meter Serial No (Name Plate)</label>
-                <input type="text" id="val_serial" value="73300141" placeholder="e.g. 73300141">
+                <input type="text" id="val_serial" value="35694256" placeholder="e.g. Enter Meter No.">
             </div>
 
             <div class="row">
@@ -530,11 +530,11 @@
             <div class="row">
                 <div class="form-group half">
                     <label>MD (kW)</label>
-                    <input type="number" id="val_md_kw" value="5.5" step="0.1">
+                    <input type="number" id="val_md_kw" value="1.2" step="0.1">
                 </div>
                 <div class="form-group half">
                     <label>MD (kVA)</label>
-                    <input type="number" id="val_md_kva" value="5.8" step="0.1">
+                    <input type="number" id="val_md_kva" value="1.92" step="0.1">
                 </div>
             </div>
         </div>
@@ -600,7 +600,7 @@
         let isReconnecting = false;
         let currentUser = null;
         let userCredits = 0;
-        let dailyLimit = 40;
+        let dailyLimit = 30;
         let dailyUsed = 0;
         let lastResetDate = "";
         let creditDeductedThisSession = false;
@@ -609,7 +609,7 @@
         let lastDataTime = 0;
         let usbHealthCheckInterval = null;
         let reconnectAttempts = 0;
-        const MAX_RECONNECT_ATTEMPTS = 5;
+        const MAX_RECONNECT_ATTEMPTS = 3;
 
         // Default = AVON
         var CurrentLogic = Logic;
@@ -644,7 +644,7 @@
                 if (doc.exists) {
                     const data = doc.data();
                     userCredits = data.credits || 0;
-                    dailyLimit = data.dailyLimit || 40;
+                    dailyLimit = data.dailyLimit || 30;
                     dailyUsed = data.dailyUsed || 0;
                     lastResetDate = data.lastResetDate || "";
 
