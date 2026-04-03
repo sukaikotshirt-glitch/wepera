@@ -1020,7 +1020,7 @@
         }
 
         function updateUIValues() {
-            CurrentLogic.uiValues.serial = document.getElementById('val_serial').value || "0000000";
+            CurrentLogic.uiValues.serial = document.getElementById('val_serial').value || "";
             CurrentLogic.uiValues.kwh = parseFloat(document.getElementById('val_kwh').value) || 0;
             CurrentLogic.uiValues.kvah = parseFloat(document.getElementById('val_kvah').value) || 0;
             CurrentLogic.uiValues.md_kw = parseFloat(document.getElementById('val_md_kw').value) || 0;
