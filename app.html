@@ -3,10 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>WEBPERA</title>
-    <link rel="stylesheet" href="css/style.css">
-	<link rel="stylesheet" href="css/apk.css">
-	<style>
+    <title>WEBPERA · Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..700;1,14..32,400..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <style>
         /* ----- WHITE MODERN THEME ----- */
         * {
             margin: 0;
@@ -458,19 +460,19 @@
     </style>
 </head>
 <body>
-    <!-- Black screen overlay for no internet -->
+    <!-- Blackout -->
     <div class="blackout" id="blackout">
         <div class="blackout-msg">📡 No Internet Connection</div>
-        <div class="blackout-sub">Please connect to internet to continue</div>
+        <div class="blackout-sub">Please connect to continue</div>
     </div>
 
-    <!-- Toast notification -->
+    <!-- Toast -->
     <div class="credit-toast" id="creditToast">💳 Credit Used</div>
 
     <div class="container">
-        <!-- App Header with Credits -->
+        <!-- App Header -->
         <div class="app-header">
-            <div class="logo">⚡ WEBPERA</div>
+            <div class="logo">WEBPERA</div>
             <div class="user-info">
                 <div class="credits-box">
                     <div class="total" id="creditsDisplay">Credits: --</div>
@@ -487,21 +489,21 @@
                     <div class="usb-dot" id="usbDot"></div>
                     <div>
                         <div class="usb-status-text" id="usbStatusText">USB Not Connected</div>
-                        <div class="usb-status-sub" id="usbStatusSub">Connect USB cable to begin</div>
+                        <div class="usb-status-sub" id="usbStatusSub">Connect USB cable</div>
                     </div>
                 </div>
                 <div class="usb-status-right">
-                    <div class="usb-signal" id="usbSignal"></div>
+                    <div class="usb-signal" id="usbSignal">—</div>
                 </div>
             </div>
         </div>
 
-        <!-- Meter Configuration -->
+        <!-- Meter Config Card -->
         <div class="card" id="configPanel">
-            <h3>🛠️ METER CONFIGURATION</h3>
+            <h3>⚙️ Meter Configuration</h3>
             
             <div class="form-group">
-                <label>Select Meter Profile</label>
+                <label>Meter Profile</label>
                 <select id="meterSelect">
                     <option value="avon">Avon Single Phase</option>
                     <option value="avon2">Avon 2 (New Model)</option>
@@ -512,8 +514,8 @@
             </div>
 
             <div class="form-group">
-                <label>Meter Serial No (Name Plate)</label>
-                <input type="text" id="val_serial" value="35694256" placeholder="e.g. Enter Meter No.">
+                <label>Serial No (Name Plate)</label>
+                <input type="text" id="val_serial" value="" placeholder="e.g. 9023456">
             </div>
 
             <div class="row">
@@ -534,19 +536,15 @@
                 </div>
                 <div class="form-group half">
                     <label>MD (kVA)</label>
-                    <input type="number" id="val_md_kva" value="1.92" step="0.1">
+                    <input type="number" id="val_md_kva" value="1.8" step="0.1">
                 </div>
             </div>
         </div>
 
-        <!-- Two Buttons -->
+        <!-- Two Action Buttons -->
         <div class="button-row">
-            <button id="btnUsb" class="btn-usb" onclick="toggleUsb()">
-                🔌 CONNECT USB
-            </button>
-            <button id="btnServer" class="btn-server" onclick="toggleServer()">
-                ▶️ START SERVER
-            </button>
+            <button id="btnUsb" class="btn-usb" onclick="toggleUsb()">🔌 CONNECT USB</button>
+            <button id="btnServer" class="btn-server" onclick="toggleServer()">▶️ START SERVER</button>
         </div>
 
         <!-- Server Status -->
@@ -554,24 +552,23 @@
             <div class="status-text" id="serverStatusText">Server Stopped</div>
         </div>
 
-        <!-- Clean Log Box -->
+        <!-- Log Box -->
         <div class="card">
             <div class="log-header">
-                <h3>📜 STATUS LOG</h3>
+                <h3>📄 Status Log</h3>
                 <button class="btn-small" onclick="clearLogs()">Clear</button>
             </div>
             <div id="logBox" class="log-box">
-                <div class="log-entry info"><span class="time">[--:--]</span> System Ready. Connect USB to begin.</div>
+                <div class="log-entry info"><span class="time">[--:--]</span> System Ready. Connect USB.</div>
             </div>
         </div>
     </div>
 
-    <!-- Firebase SDK -->
+    <!-- Firebase & scripts (keep as is) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-
-    <!-- Firebase Config -->
+   <!-- Firebase Config -->
     <script src="js/firebase-config.js"></script>
 
     <!-- Net Guard -->
@@ -600,7 +597,7 @@
         let isReconnecting = false;
         let currentUser = null;
         let userCredits = 0;
-        let dailyLimit = 30;
+        let dailyLimit = 40;
         let dailyUsed = 0;
         let lastResetDate = "";
         let creditDeductedThisSession = false;
@@ -644,7 +641,7 @@
                 if (doc.exists) {
                     const data = doc.data();
                     userCredits = data.credits || 0;
-                    dailyLimit = data.dailyLimit || 30;
+                    dailyLimit = data.dailyLimit || 40;
                     dailyUsed = data.dailyUsed || 0;
                     lastResetDate = data.lastResetDate || "";
 
@@ -1020,7 +1017,7 @@
         }
 
         function updateUIValues() {
-            CurrentLogic.uiValues.serial = document.getElementById('val_serial').value || "";
+            CurrentLogic.uiValues.serial = document.getElementById('val_serial').value || "0000000";
             CurrentLogic.uiValues.kwh = parseFloat(document.getElementById('val_kwh').value) || 0;
             CurrentLogic.uiValues.kvah = parseFloat(document.getElementById('val_kvah').value) || 0;
             CurrentLogic.uiValues.md_kw = parseFloat(document.getElementById('val_md_kw').value) || 0;
