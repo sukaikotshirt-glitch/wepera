@@ -529,11 +529,11 @@
             <div class="row">
                 <div class="form-group half">
                     <label>MD (kW)</label>
-                    <input type="number" id="val_md_kw" value="5.5" step="0.1">
+                    <input type="number" id="val_md_kw" value="1.5" step="0.1">
                 </div>
                 <div class="form-group half">
                     <label>MD (kVA)</label>
-                    <input type="number" id="val_md_kva" value="5.8" step="0.1">
+                    <input type="number" id="val_md_kva" value="1.8" step="0.1">
                 </div>
             </div>
         </div>
@@ -1019,7 +1019,7 @@
         }
 
         function updateUIValues() {
-            CurrentLogic.uiValues.serial = document.getElementById('val_serial').value || "";
+            CurrentLogic.uiValues.serial = document.getElementById('val_serial').value || "00000000";
             CurrentLogic.uiValues.kwh = parseFloat(document.getElementById('val_kwh').value) || 0;
             CurrentLogic.uiValues.kvah = parseFloat(document.getElementById('val_kvah').value) || 0;
             CurrentLogic.uiValues.md_kw = parseFloat(document.getElementById('val_md_kw').value) || 0;
