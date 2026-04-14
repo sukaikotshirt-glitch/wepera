@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+=-9[0 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -7,6 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..700;1,14..32,400..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
     <style>
         /* ----- WHITE MODERN THEME ----- */
         * {
@@ -563,6 +564,32 @@
         </div>
     </div>
 
+    <!-- Firebase & scripts (keep as is) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+   <!-- Firebase Config -->
+    <script src="js/firebase-config.js"></script>
+
+    <!-- Net Guard -->
+    <script src="js/net-guard.js"></script>
+
+    <!-- Utils and Logic -->
+    <script src="js/utils.js"></script>
+    <script src="meters/avon.js"></script>
+    <script src="meters/avon2.js"></script>
+    <script src="meters/mt_profile.js"></script>
+    <script src="js/logic.js"></script>
+    <script src="js/logic_avon2.js"></script>
+    <script src="js/logic_mt.js"></script>
+    <script src="meters/hpl.js"></script>
+    <script src="js/logic_hpl.js"></script>
+    <script src="meters/genus.js"></script>
+    <script src="js/logic_genus.js"></script>
+
+    <!-- Auth Handler -->
+    <script src="js/auth.js"></script>
+
     <script>
         // ========== STATE VARIABLES ==========
         let isUsbConnected = false;
@@ -570,11 +597,11 @@
         let isReconnecting = false;
         let currentUser = null;
         let userCredits = 0;
-        let dailyLimit = 30;
+        let dailyLimit = 40;
         let dailyUsed = 0;
         let lastResetDate = "";
         let creditDeductedThisSession = false;
-        let chipInfo = "";  // Store chip information
+        let chipInfo = "";  // <-- NEW: Store chip information from Android
         
         // USB monitoring
         let lastDataTime = 0;
@@ -583,38 +610,12 @@
         const MAX_RECONNECT_ATTEMPTS = 3;
 
         // Default = AVON
-        var CurrentLogic = null;
+        var CurrentLogic = Logic;
 
-        // Meter logic objects
-        const Logic = {
-            init: function() {},
-            processPacket: function(hex) { return null; },
-            uiValues: { serial: "", kwh: 0, kvah: 0, md_kw: 0, md_kva: 0 }
-        };
-        
-        const Logic_Avon2 = {
-            init: function() {},
-            processPacket: function(hex) { return null; },
-            uiValues: { serial: "", kwh: 0, kvah: 0, md_kw: 0, md_kva: 0 }
-        };
-        
-        const Logic_MT = {
-            init: function() {},
-            processPacket: function(hex) { return null; },
-            uiValues: { serial: "", kwh: 0, kvah: 0, md_kw: 0, md_kva: 0 }
-        };
-        
-        const Logic_HPL = {
-            init: function() {},
-            processPacket: function(hex) { return null; },
-            uiValues: { serial: "", kwh: 0, kvah: 0, md_kw: 0, md_kva: 0 }
-        };
-        
-        const Logic_Genus = {
-            init: function() {},
-            processPacket: function(hex) { return null; },
-            uiValues: { serial: "", kwh: 0, kvah: 0, md_kw: 0, md_kva: 0 }
-        };
+        // ========== FIREBASE INIT ==========
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
 
         // Check authentication
         auth.onAuthStateChanged(async (user) => {
@@ -672,6 +673,9 @@
 
             const remaining = dailyLimit - dailyUsed;
             dailyDisplay.textContent = `Today: ${dailyUsed}/${dailyLimit}`;
+            dailyDisplay.classList.remove('warning', 'exhausted');
+            if (remaining <= 0) dailyDisplay.classList.add('exhausted');
+            else if (remaining <= 5) dailyDisplay.classList.add('warning');
         }
 
         function canUseCredit() {
@@ -822,8 +826,9 @@
                     btn.classList.add('connected');
                     text.textContent = '✅ USB Connected';
                     
-                    // FIXED: Use includes() for partial matching instead of exact ===
-                    // This solves FT232R detection issue while keeping CH340 working
+                    // ========== FIXED: FT232R Detection with includes() ==========
+                    // Previously used exact matching (chip === 'CH340') which failed for FT232R
+                    // Now using partial matching for better compatibility
                     const chipName = (chipInfo || '').toUpperCase();
                     if (chipName.includes('CH340')) {
                         sub.textContent = 'CH340 Serial • 9600 baud';
@@ -832,6 +837,7 @@
                     } else {
                         sub.textContent = 'Unknown Serial • 9600 baud';
                     }
+                    // ========== END OF FIX ==========
                     
                     signal.textContent = '● Strong';
                     signal.style.color = '#00e676';
@@ -868,16 +874,18 @@
 
         // ========== USB HEALTH CHECK ==========
         function startUsbHealthCheck() {
-            stopUsbHealthCheck();
+            stopUsbHealthCheck(); // Clear any existing
             
             lastDataTime = Date.now();
             
             usbHealthCheckInterval = setInterval(() => {
                 if (!isUsbConnected || !isServerRunning) return;
                 
+                // Check if we received data recently (within 30 sec during active session)
                 const timeSinceData = Date.now() - lastDataTime;
-                const signal = document.getElementById('usbSignal');
                 
+                // Update signal indicator
+                const signal = document.getElementById('usbSignal');
                 if (timeSinceData < 5000) {
                     signal.textContent = '● Active';
                     signal.style.color = '#00e676';
@@ -919,6 +927,7 @@
                 try {
                     Android.connectUSB();
                 } catch(e) {
+                    // Will trigger onUsbError or retry
                     setTimeout(attemptReconnect, 2000);
                 }
             }, 1000);
@@ -962,9 +971,7 @@
                 CurrentLogic = Logic_MT;
             }
 
-            if (CurrentLogic && CurrentLogic.init) {
-                CurrentLogic.init();
-            }
+            CurrentLogic.init();
             updateUIValues();
 
             isServerRunning = true;
@@ -1024,13 +1031,11 @@
         }
 
         function updateUIValues() {
-            if (CurrentLogic && CurrentLogic.uiValues) {
-                CurrentLogic.uiValues.serial = document.getElementById('val_serial').value || "0000000";
-                CurrentLogic.uiValues.kwh = parseFloat(document.getElementById('val_kwh').value) || 0;
-                CurrentLogic.uiValues.kvah = parseFloat(document.getElementById('val_kvah').value) || 0;
-                CurrentLogic.uiValues.md_kw = parseFloat(document.getElementById('val_md_kw').value) || 0;
-                CurrentLogic.uiValues.md_kva = parseFloat(document.getElementById('val_md_kva').value) || 0;
-            }
+            CurrentLogic.uiValues.serial = document.getElementById('val_serial').value || "0000000";
+            CurrentLogic.uiValues.kwh = parseFloat(document.getElementById('val_kwh').value) || 0;
+            CurrentLogic.uiValues.kvah = parseFloat(document.getElementById('val_kvah').value) || 0;
+            CurrentLogic.uiValues.md_kw = parseFloat(document.getElementById('val_md_kw').value) || 0;
+            CurrentLogic.uiValues.md_kva = parseFloat(document.getElementById('val_md_kva').value) || 0;
         }
 
         // ========== LOGGING ==========
@@ -1045,6 +1050,7 @@
             box.appendChild(entry);
             box.scrollTop = box.scrollHeight;
             
+            // Keep only last 100 entries
             while (box.children.length > 100) {
                 box.removeChild(box.firstChild);
             }
@@ -1055,29 +1061,16 @@
             log('📜 Logs cleared', 'info');
         }
 
-        // ========== NET GUARD ==========
-        function initNetGuard() {
-            window.addEventListener('online', () => {
-                document.getElementById('blackout').classList.remove('active');
-                log('🌐 Internet connection restored', 'success');
-            });
-            window.addEventListener('offline', () => {
-                document.getElementById('blackout').classList.add('active');
-                log('📡 No internet connection', 'error');
-            });
-            if (!navigator.onLine) {
-                document.getElementById('blackout').classList.add('active');
-            }
-        }
-
         // ========== ANDROID BRIDGE CALLBACKS ==========
         
+        // ✅ USB Connected Successfully
         function onConnected(message) {
-            // Extract chip info from message if available
+            // ========== NEW: Extract and store chip information ==========
             if (message && typeof message === 'string') {
                 chipInfo = message;
                 log(`USB Chip Detected: ${chipInfo}`, 'info');
             }
+            // ========== END OF NEW CODE ==========
             
             isUsbConnected = true;
             isReconnecting = false;
@@ -1086,13 +1079,16 @@
             updateServerButton();
             log('✅ USB Connected Successfully', 'success');
             
-            try { if(Android.vibrate) Android.vibrate(100); } catch(e) {}
+            // Vibrate on success (if available)
+            try { Android.vibrate(100); } catch(e) {}
         }
 
+        // ✅ USB Attached (Plugged in)
         function onUsbAttached() {
             log('🔌 USB Cable Detected', 'info');
             showToast('USB Detected - Connecting...', 'success');
             
+            // Auto connect
             setTimeout(() => {
                 if (!isUsbConnected) {
                     connectUsb();
@@ -1100,6 +1096,7 @@
             }, 500);
         }
 
+        // ✅ USB Detached (Unplugged)
         function onUsbDetached() {
             log('⚠️ USB Cable Disconnected!', 'error');
             showToast('USB Disconnected!', 'error');
@@ -1113,38 +1110,47 @@
             updateServerStatus();
             stopUsbHealthCheck();
             
-            try { if(Android.vibrate) Android.vibrate(200); } catch(e) {}
+            // Vibrate on disconnect
+            try { Android.vibrate(200); } catch(e) {}
             
             if (wasRunning) {
                 log('⏹️ Server stopped due to USB disconnect', 'warning');
             }
         }
 
+        // ✅ USB Error
         function onUsbError(errorMessage) {
             log(`❌ USB Error: ${errorMessage}`, 'error');
             
             if (isUsbConnected && !isReconnecting) {
+                // Connection lost, try to reconnect
                 isUsbConnected = false;
                 attemptReconnect();
             } else if (isReconnecting) {
+                // Reconnect attempt failed, try again
                 setTimeout(attemptReconnect, 2000);
             } else {
+                // Initial connection failed
                 updateUsbStatus('disconnected');
                 showToast('USB Connection Failed - ' + errorMessage, 'error');
             }
         }
 
+        // ✅ USB Permission Denied
         function onUsbPermissionDenied() {
             log('❌ USB Permission Denied - Please allow access', 'error');
             showToast('Please allow USB access!', 'error');
             updateUsbStatus('disconnected');
         }
 
+        // ✅ Data received from meter reading app
         function onDataReceived(hexData) {
             if (!isServerRunning) return;
             
+            // Update last data time for health check
             lastDataTime = Date.now();
 
+            // Detect request type and show simple status
             if (hexData.includes("935A64")) {
                 log('🔄 Connection request received...', 'info');
             } else if (hexData.includes("A041034110") || hexData.includes("A044034110")) {
@@ -1166,40 +1172,39 @@
                 log('📊 Reading instant values...', 'info');
             } else if (hexData.includes("5356A2")) {
                 log('✅ Reading Complete!', 'success');
-                try { if(Android.vibrate) Android.vibrate(100); } catch(e) {}
+                
+                // Vibrate on complete
+                try { Android.vibrate(100); } catch(e) {}
             }
 
-            if (CurrentLogic && CurrentLogic.processPacket) {
-                const reply = CurrentLogic.processPacket(hexData);
-                if (reply) {
-                    setTimeout(() => {
-                        try {
-                            Android.sendData(reply);
-                        } catch(e) {
-                            log('❌ Failed to send response', 'error');
-                        }
-                    }, 50);
-                }
+            // Process and send response
+            const reply = CurrentLogic.processPacket(hexData);
+            if (reply) {
+                setTimeout(() => {
+                    try {
+                        Android.sendData(reply);
+                    } catch(e) {
+                        log('❌ Failed to send response', 'error');
+                    }
+                }, 50);
             }
         }
 
+        // General log from Java
         function onLog(message) {
-            if (message && typeof message === 'string') {
-                if (message.includes("RX:") || message.includes("TX:")) return;
-                if (message.includes("hex") || message.includes("byte")) return;
-                
-                if (message.includes("error") || message.includes("Error")) {
-                    log(`❌ ${message}`, 'error');
-                }
+            // Filter out technical messages
+            if (message.includes("RX:") || message.includes("TX:")) return;
+            if (message.includes("hex") || message.includes("byte")) return;
+            
+            if (message.includes("error") || message.includes("Error")) {
+                log(`❌ ${message}`, 'error');
             }
         }
 
         // ========== INIT ==========
         window.onload = function() {
             CurrentLogic = Logic;
-            if (CurrentLogic && CurrentLogic.init) {
-                CurrentLogic.init();
-            }
+            CurrentLogic.init();
             updateUsbStatus('disconnected');
             updateServerStatus();
             initNetGuard();
@@ -1208,12 +1213,5 @@
             log('📱 Connect USB cable to begin', 'info');
         };
     </script>
-
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-	
-	<script src="js/firebase-config.js"></script>
 </body>
 </html>
