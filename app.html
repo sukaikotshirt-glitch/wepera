@@ -775,17 +775,36 @@
             }
         }
 
-        function connectUsb() {
-            log('🔌 Connecting USB...', 'info');
-            updateUsbStatus('connecting');
-            
-            try {
-                Android.connectUSB();
-            } catch(e) {
-                log('❌ USB connection failed - Android bridge not found', 'error');
-                updateUsbStatus('disconnected');
-            }
-        }
+		function connectUsb() {
+			log('🔌 Detecting USB device...', 'info');
+			updateUsbStatus('connecting');
+		
+			try {
+				// CH340 FIRST TRY
+				if (typeof Android.connectUSB === "function") {
+					Android.connectUSB(6790, 29987); // CH340
+					log('➡️ Trying CH340 device...', 'info');
+				}
+		
+				// FTDI fallback
+				setTimeout(() => {
+					if (!isUsbConnected) {
+						log('🔁 Trying FTDI device...', 'warning');
+		
+						try {
+							Android.connectUSB(0x0403, 0x6001); // FTDI
+						} catch (e) {
+							log('❌ FTDI connect failed', 'error');
+							updateUsbStatus('disconnected');
+						}
+					}
+				}, 1200);
+		
+			} catch (e) {
+				log('❌ USB bridge error', 'error');
+				updateUsbStatus('disconnected');
+			}
+		}
 
         function disconnectUsb() {
             if (isServerRunning) {
