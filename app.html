@@ -591,25 +591,26 @@
     <script src="js/auth.js"></script>
 	
 	<script>
-		// ========== STATE VARIABLES ==========
+		// ========== STATE ==========
 		let isUsbConnected = false;
 		let isServerRunning = false;
 		let isReconnecting = false;
+		let reconnectAttempts = 0;
+		const MAX_RECONNECT_ATTEMPTS = 3;
+	
 		let currentUser = null;
 		let userCredits = 0;
-		let dailyLimit = 30;
+		let dailyLimit = 40;
 		let dailyUsed = 0;
 		let lastResetDate = "";
 		let creditDeductedThisSession = false;
 	
 		let lastDataTime = 0;
 		let usbHealthCheckInterval = null;
-		let reconnectAttempts = 0;
-		const MAX_RECONNECT_ATTEMPTS = 3;
 	
 		var CurrentLogic = Logic;
 	
-		// ========== FIREBASE INIT ==========
+		// ========== FIREBASE ==========
 		firebase.initializeApp(firebaseConfig);
 		const auth = firebase.auth();
 		const db = firebase.firestore();
@@ -618,10 +619,6 @@
 			if (user) {
 				currentUser = user;
 				await loadUserData();
-				if (userCredits <= 0) {
-					await auth.signOut();
-					window.location.href = 'index.html';
-				}
 			} else {
 				window.location.href = 'index.html';
 			}
@@ -633,161 +630,143 @@
 		}
 	
 		async function loadUserData() {
-			try {
-				const doc = await db.collection('users').doc(currentUser.uid).get();
-				if (doc.exists) {
-					const data = doc.data();
-					userCredits = data.credits || 0;
-					dailyLimit = data.dailyLimit || 30;
-					dailyUsed = data.dailyUsed || 0;
-					lastResetDate = data.lastResetDate || "";
+			const doc = await db.collection('users').doc(currentUser.uid).get();
+			if (doc.exists) {
+				const data = doc.data();
+				userCredits = data.credits || 0;
+				dailyLimit = data.dailyLimit || 40;
+				dailyUsed = data.dailyUsed || 0;
+				lastResetDate = data.lastResetDate || "";
 	
-					const today = getTodayDate();
-					if (lastResetDate !== today) {
-						dailyUsed = 0;
-						lastResetDate = today;
-						await db.collection('users').doc(currentUser.uid).update({
-							dailyUsed: 0,
-							lastResetDate: today
-						});
-					}
-					updateCreditsDisplay();
-				}
-			} catch (error) {
-				console.error('Error loading user data:', error);
+				updateCreditsDisplay();
 			}
 		}
 	
 		function updateCreditsDisplay() {
-			const totalDisplay = document.getElementById('creditsDisplay');
-			const dailyDisplay = document.getElementById('dailyDisplay');
-	
-			totalDisplay.textContent = `Credits: ${userCredits}`;
-			dailyDisplay.textContent = `Today: ${dailyUsed}/${dailyLimit}`;
+			document.getElementById('creditsDisplay').textContent =
+				`Credits: ${userCredits}`;
 		}
 	
-		// ========== USB CONNECT (FIXED CH340 + FTDI) ==========
+		// ========== 🔥 CONNECT USB (FIXED BUTTON ISSUE) ==========
 		function connectUsb() {
-			log('🔌 Connecting USB...', 'info');
-			updateUsbStatus('connecting');
+			log("🔌 Connect Button Clicked", "info");
+			updateUsbStatus("connecting");
 	
 			try {
-				Android.connectUSB(JSON.stringify({
+				if (!window.Android) {
+					log("❌ Android bridge not found", "error");
+					updateUsbStatus("disconnected");
+					return;
+				}
+	
+				// ✅ FIX: CH340 + FTDI SUPPORT
+				window.Android.connectUSB(JSON.stringify({
 					devices: [
 						{ vendorId: 0x1A86, productId: 0x7523, name: "CH340" },
 						{ vendorId: 0x0403, productId: 0x6001, name: "FTDI_FT232R" }
 					],
 					baudRate: 9600
 				}));
+	
+				log("📡 USB connect request sent", "success");
+	
 			} catch (e) {
-				log('❌ Android bridge not found', 'error');
-				updateUsbStatus('disconnected');
+				log("❌ Connect failed: " + e.message, "error");
+				updateUsbStatus("disconnected");
 			}
 		}
 	
+		// ========== DISCONNECT ==========
 		function disconnectUsb() {
-			stopUsbHealthCheck();
-			try { Android.disconnect(); } catch(e) {}
+			try {
+				window.Android.disconnect();
+			} catch(e) {}
 	
 			isUsbConnected = false;
 			isServerRunning = false;
-			updateUsbStatus('disconnected');
-			updateServerButton();
+	
+			updateUsbStatus("disconnected");
+			log("🔌 USB Disconnected", "warning");
 		}
 	
 		// ========== USB STATUS ==========
 		function updateUsbStatus(status) {
-			const text = document.getElementById('usbStatusText');
-			const sub = document.getElementById('usbStatusSub');
+			let text = document.getElementById("usbStatusText");
+			let sub = document.getElementById("usbStatusSub");
 	
 			if (!text) return;
 	
-			switch(status) {
-				case 'connected':
-					text.textContent = 'USB Connected';
-					sub.textContent = 'CH340 / FTDI Active';
-					isUsbConnected = true;
-					break;
-	
-				case 'connecting':
-					text.textContent = 'Connecting USB...';
-					sub.textContent = 'Detecting device...';
-					break;
-	
-				default:
-					text.textContent = 'USB Not Connected';
-					sub.textContent = 'Connect device';
-					isUsbConnected = false;
+			if (status === "connected") {
+				text.innerText = "USB Connected";
+				sub.innerText = "CH340 / FTDI Active";
+				isUsbConnected = true;
 			}
-		}
 	
-		// ========== AUTO RECONNECT ==========
-		function attemptReconnect() {
-			if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) return;
+			if (status === "connecting") {
+				text.innerText = "Connecting USB...";
+				sub.innerText = "Please wait...";
+			}
 	
-			reconnectAttempts++;
-			setTimeout(() => {
-				connectUsb();
-			}, 1500);
+			if (status === "disconnected") {
+				text.innerText = "USB Not Connected";
+				sub.innerText = "Click connect button";
+				isUsbConnected = false;
+			}
 		}
 	
 		// ========== SERVER ==========
 		function startServer() {
+			if (!isUsbConnected) {
+				log("⚠️ Connect USB first", "warning");
+				return;
+			}
+	
 			isServerRunning = true;
-			log('Server Started', 'success');
+			creditDeductedThisSession = false;
+	
+			CurrentLogic.init();
+	
+			log("▶️ Server Started", "success");
 		}
 	
 		function stopServer() {
 			isServerRunning = false;
-			log('Server Stopped', 'warning');
+			log("⏹️ Server Stopped", "warning");
 		}
-	
-		function updateServerButton() {}
-	
-		function updateServerStatus() {}
-	
-		function lockConfig() {}
-	
-		function updateUIValues() {}
 	
 		// ========== CREDIT ==========
 		async function deductCredit() {
 			if (!currentUser || creditDeductedThisSession) return false;
 	
-			try {
-				await db.collection('users').doc(currentUser.uid).update({
-					credits: firebase.firestore.FieldValue.increment(-1),
-					dailyUsed: firebase.firestore.FieldValue.increment(1)
-				});
+			await db.collection('users').doc(currentUser.uid).update({
+				credits: firebase.firestore.FieldValue.increment(-1),
+				dailyUsed: firebase.firestore.FieldValue.increment(1)
+			});
 	
-				userCredits--;
-				dailyUsed++;
-				creditDeductedThisSession = true;
+			userCredits--;
+			dailyUsed++;
+			creditDeductedThisSession = true;
 	
-				updateCreditsDisplay();
-				return true;
-	
-			} catch (e) {
-				console.error(e);
-				return false;
-			}
+			updateCreditsDisplay();
+			return true;
 		}
 	
 		// ========== LOG ==========
-		function log(msg) {
+		function log(msg, type="info") {
 			console.log(msg);
 		}
 	
-		// ========== ANDROID CALLBACKS ==========
+		// ========== 🔥 ANDROID CALLBACKS ==========
 		function onConnected() {
 			isUsbConnected = true;
-			updateUsbStatus('connected');
-			log('USB Connected');
+			updateUsbStatus("connected");
+			log("✅ USB Connected Successfully");
 		}
 	
 		function onUsbError(msg) {
 			isUsbConnected = false;
-			log('USB Error: ' + msg);
+			updateUsbStatus("disconnected");
+			log("❌ USB Error: " + msg);
 		}
 	
 		function onDataReceived(hexData) {
@@ -799,12 +778,14 @@
 				deductCredit();
 			}
 	
-			const reply = CurrentLogic.processPacket(hexData);
+			let reply = CurrentLogic.processPacket(hexData);
 	
 			if (reply) {
 				try {
-					Android.sendData(reply);
-				} catch(e) {}
+					window.Android.sendData(reply);
+				} catch(e) {
+					log("Send failed");
+				}
 			}
 		}
 	
@@ -813,8 +794,9 @@
 			CurrentLogic = Logic;
 			CurrentLogic.init();
 	
-			updateUsbStatus('disconnected');
-			log('System Ready (CH340 + FTDI Support)');
+			updateUsbStatus("disconnected");
+	
+			log("🚀 System Ready");
 		};
 	</script>
     
