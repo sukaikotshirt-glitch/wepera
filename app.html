@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+=-9[0 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -824,7 +824,13 @@
                     dot.classList.add('connected');
                     btn.classList.add('connected');
                     text.textContent = '✅ USB Connected';
-                    sub.textContent = 'CH340 Serial • 9600 baud';
+                    if (chip === 'CH340') {
+						sub.textContent = 'CH340 Serial • 9600 baud';
+					} else if (chip === 'FT232R') {
+						sub.textContent = 'FT232R Serial • 9600 baud';
+					} else {
+						sub.textContent = 'Unknown Serial • 9600 baud';
+					}
                     signal.textContent = '● Strong';
                     signal.style.color = '#00e676';
                     btn.textContent = '🔌 DISCONNECT USB';
