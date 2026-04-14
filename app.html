@@ -570,7 +570,7 @@
         let isReconnecting = false;
         let currentUser = null;
         let userCredits = 0;
-        let dailyLimit = 40;
+        let dailyLimit = 30;
         let dailyUsed = 0;
         let lastResetDate = "";
         let creditDeductedThisSession = false;
@@ -615,21 +615,6 @@
             processPacket: function(hex) { return null; },
             uiValues: { serial: "", kwh: 0, kvah: 0, md_kw: 0, md_kva: 0 }
         };
-
-        // ========== FIREBASE CONFIG ==========
-        const firebaseConfig = {
-            apiKey: "AIzaSyDummyKeyForExample123456789",
-            authDomain: "your-app.firebaseapp.com",
-            projectId: "your-project-id",
-            storageBucket: "your-app.appspot.com",
-            messagingSenderId: "123456789012",
-            appId: "1:123456789012:web:abc123def456"
-        };
-        
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
 
         // Check authentication
         auth.onAuthStateChanged(async (user) => {
@@ -1228,5 +1213,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+	
+	<script src="js/firebase-config.js"></script>
 </body>
 </html>
