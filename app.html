@@ -477,14 +477,13 @@
     <!-- Auth Handler -->
     <script src="js/auth.js"></script>
     
-    <script> 
-        // ----------------------------- MOCK LOGIC (Minimal but complete) ----------------------
+    <script>
+        // ----------------------------- METER LOGIC (Base) ----------------------
         const Logic = {
             uiValues: { serial: "", kwh: 0, kvah: 0, md_kw: 0, md_kva: 0 },
             init: function() {},
             processPacket: function(hex) {
-                // Basic response simulation for meter reading
-                if (hex.includes("0201020204")) return "A0FF0210";  // billing ack
+                if (hex.includes("0201020204")) return "A0FF0210";
                 if (hex.includes("0100010700")) return "A0FF0310";
                 if (hex.includes("0100600100")) return "A0FF0410";
                 return null;
@@ -492,37 +491,26 @@
         };
         const Logic_Avon2 = Logic, Logic_HPL = Logic, Logic_Genus = Logic, Logic_MT = Logic;
         
-        // ----------------------------- APP STATE --------------------------------------------
+        // ----------------------------- APP STATE -------------------------------
         let isUsbConnected = false;
         let isServerRunning = false;
         let isReconnecting = false;
         let currentUser = null;
-        let userCredits = 100;    // demo credits
+        let userCredits = 100;
         let dailyLimit = 40;
         let dailyUsed = 0;
         let creditDeductedThisSession = false;
         let lastDataTime = 0;
         let usbHealthInterval = null;
         let reconnectAttempts = 0;
+        let connectionTimeout = null;
         const MAX_RECONNECT = 3;
         let CurrentLogic = Logic;
         
-        // Auth mock (skip real for demo but keep logout flow)
-        const auth = { currentUser: { uid: "demo" }, onAuthStateChanged: (cb) => cb({ uid: "demo" }), signOut: () => { window.location.href = 'index.html'; } };
-        const db = { collection: () => ({ doc: () => ({ get: async () => ({ exists: true, data: () => ({ credits: 100, dailyLimit: 40, dailyUsed: 0, lastResetDate: "" }) }), update: async () => {} }) }) };
+        // Auth and Firestore references
+        let auth, db;
         
-        // Override with real Firebase if available, else safe mock
-        if (typeof firebase !== 'undefined' && firebase.initializeApp) {
-            try { firebase.initializeApp(firebaseConfig); } catch(e) {}
-            const realAuth = firebase.auth();
-            const realDb = firebase.firestore();
-            auth.onAuthStateChanged = realAuth.onAuthStateChanged.bind(realAuth);
-            auth.signOut = realAuth.signOut.bind(realAuth);
-            window.auth = realAuth;
-            window.db = realDb;
-        }
-        
-        // Helper functions
+        // Helper Functions
         function log(msg, type = '') {
             const box = document.getElementById('logBox');
             const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour:'2-digit', minute:'2-digit', second:'2-digit' });
@@ -566,7 +554,7 @@
             return true;
         }
         
-        function updateUsbStatus(status) {
+        function updateUsbStatus(status, deviceType = null) {
             const card = document.getElementById('usbStatusCard');
             const dot = document.getElementById('usbDot');
             const text = document.getElementById('usbStatusText');
@@ -576,85 +564,143 @@
             card.classList.remove('connected', 'reconnecting');
             dot.classList.remove('connected', 'reconnecting');
             btn.classList.remove('connected', 'reconnecting');
+            
             if(status === 'connected') {
                 card.classList.add('connected'); dot.classList.add('connected'); btn.classList.add('connected');
-                text.textContent = '✅ USB Connected'; sub.textContent = 'CH340 / FTDI • 9600 baud';
+                text.textContent = '✅ USB Connected';
+                const deviceText = deviceType ? deviceType : (window.currentDeviceType || 'CH340/FTDI');
+                sub.textContent = `${deviceText} • 9600 baud`;
                 signal.textContent = '● Active'; signal.style.color = '#00e676';
                 btn.textContent = '🔌 DISCONNECT USB';
             } else if(status === 'reconnecting') {
                 card.classList.add('reconnecting'); dot.classList.add('reconnecting'); btn.classList.add('reconnecting');
-                text.textContent = '🔄 Reconnecting...'; sub.textContent = `Attempt ${reconnectAttempts}/${MAX_RECONNECT}`;
+                text.textContent = '🔄 Reconnecting...'; 
+                sub.textContent = `Attempt ${reconnectAttempts}/${MAX_RECONNECT}`;
                 signal.textContent = '● Retry'; signal.style.color = '#ff9800';
                 btn.textContent = '⏳ RECONNECTING...';
             } else if(status === 'connecting') {
-                text.textContent = '🔌 Connecting...'; sub.textContent = 'Probing CH340 & FTDI';
+                text.textContent = '🔌 Connecting...'; 
+                sub.textContent = 'Probing CH340 & FTDI...';
                 btn.textContent = '⏳ CONNECTING...';
+                signal.textContent = '●';
             } else {
-                text.textContent = '❌ USB Not Connected'; sub.textContent = 'Connect USB cable (CH340/FTDI)';
+                text.textContent = '❌ USB Not Connected'; 
+                sub.textContent = 'Connect USB cable (CH340/FTDI)';
                 btn.textContent = '🔌 CONNECT USB';
                 signal.textContent = '—';
+                window.currentDeviceType = null;
             }
         }
         
-        // ========== UNIVERSAL USB BRIDGE - CH340 + FTDI DUAL SUPPORT ==========
+        // ========== UNIVERSAL USB BRIDGE - FIXED CONNECT BUTTON ==========
         function connectUsb() {
-            if(isUsbConnected) return;
-            log('🔌 Initiating USB connection: detecting CH340 & FTDI...', 'info');
+            if(isUsbConnected) {
+                log('USB already connected', 'warning');
+                return;
+            }
+            if(isReconnecting) {
+                log('Reconnection already in progress', 'warning');
+                return;
+            }
+            
+            log('🔌 Starting USB connection...', 'info');
             updateUsbStatus('connecting');
             
-            // Use Android WebView interface if available
+            // Clear any existing timeout
+            if(connectionTimeout) clearTimeout(connectionTimeout);
+            
+            // Set connection timeout (8 seconds)
+            connectionTimeout = setTimeout(() => {
+                if(!isUsbConnected && !isReconnecting) {
+                    log('❌ Connection timeout - no device responded', 'error');
+                    updateUsbStatus('disconnected');
+                    showToast('No USB device detected', 'error');
+                }
+            }, 8000);
+            
+            // Check if Android bridge is available
             if(typeof Android !== 'undefined' && Android.connectUSB) {
-                // Step 1: Try CH340 (VID: 6790, PID: 29987)
-                try {
-                    log('📟 Attempting CH340 (VID:0x1A86, PID:0x7523)', 'info');
-                    Android.connectUSB(6790, 29987);  // CH340 classic
-                } catch(e) { log('CH340 init error', 'error'); }
+                log('📱 Android USB bridge detected', 'info');
                 
-                // Step 2: Fallback to FTDI after short delay if not connected
+                // Try CH340 first (VID: 0x1A86, PID: 0x7523)
+                try {
+                    log('🔍 Trying CH340 device (VID:1A86, PID:7523)...', 'info');
+                    Android.connectUSB(6790, 29987);  // CH340
+                } catch(e) {
+                    log('CH340 connection error: ' + e.message, 'error');
+                }
+                
+                // Try FTDI after 1.5 seconds if not connected yet
                 setTimeout(() => {
-                    if(!isUsbConnected && typeof Android.connectUSB === 'function') {
-                        log('🔁 Trying FTDI (VID:0x0403, PID:0x6001)', 'warning');
+                    if(!isUsbConnected && typeof Android !== 'undefined' && Android.connectUSB) {
+                        log('🔍 Trying FTDI device (VID:0403, PID:6001)...', 'info');
                         try {
-                            Android.connectUSB(0x0403, 0x6001);  // FTDI FT232
-                        } catch(e) { log('FTDI connection error', 'error'); }
+                            Android.connectUSB(0x0403, 0x6001);  // FTDI
+                        } catch(e) {
+                            log('FTDI connection error: ' + e.message, 'error');
+                        }
                     }
-                }, 1000);
+                }, 1500);
+                
             } else {
-                log('❌ Android bridge missing - ensure WebView USB API available', 'error');
+                log('❌ Android USB bridge not available!', 'error');
+                log('💡 Make sure this app is running inside WebView with USB Host API', 'error');
                 updateUsbStatus('disconnected');
                 showToast('USB Bridge not available', 'error');
+                if(connectionTimeout) clearTimeout(connectionTimeout);
             }
         }
         
         function disconnectUsb() {
+            if(connectionTimeout) clearTimeout(connectionTimeout);
             if(isServerRunning) stopServer();
             if(usbHealthInterval) clearInterval(usbHealthInterval);
-            try { if(typeof Android !== 'undefined' && Android.disconnect) Android.disconnect(); } catch(e) {}
+            
+            try { 
+                if(typeof Android !== 'undefined' && Android.disconnect) {
+                    Android.disconnect();
+                }
+            } catch(e) { log('Disconnect error: ' + e.message, 'error'); }
+            
             isUsbConnected = false;
             isReconnecting = false;
             reconnectAttempts = 0;
+            window.currentDeviceType = null;
             updateUsbStatus('disconnected');
             updateServerButton();
-            log('🔌 USB disconnected', 'warning');
+            log('🔌 USB disconnected manually', 'warning');
         }
         
         function attemptReconnect() {
             if(reconnectAttempts >= MAX_RECONNECT) {
-                log('❌ Auto-reconnect failed, manual intervention required', 'error');
+                log('❌ Auto-reconnect failed after ' + MAX_RECONNECT + ' attempts', 'error');
                 isReconnecting = false;
                 reconnectAttempts = 0;
                 updateUsbStatus('disconnected');
+                showToast('USB connection lost. Please reconnect manually.', 'error');
                 return;
             }
             reconnectAttempts++;
             isReconnecting = true;
             updateUsbStatus('reconnecting');
             log(`🔄 Auto-reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT}`, 'warning');
+            
             setTimeout(() => {
                 if(typeof Android !== 'undefined' && Android.connectUSB) {
-                    try { Android.connectUSB(6790, 29987); } catch(e) { setTimeout(attemptReconnect, 2000); }
-                    setTimeout(() => { if(!isUsbConnected) attemptReconnect(); }, 1800);
-                } else { attemptReconnect(); }
+                    try { 
+                        Android.connectUSB(6790, 29987);
+                        // Also try FTDI
+                        setTimeout(() => {
+                            if(!isUsbConnected && typeof Android !== 'undefined' && Android.connectUSB) {
+                                try { Android.connectUSB(0x0403, 0x6001); } catch(e) {}
+                            }
+                        }, 800);
+                    } catch(e) { 
+                        setTimeout(() => attemptReconnect(), 2000);
+                    }
+                } else {
+                    setTimeout(() => attemptReconnect(), 2000);
+                }
             }, 1000);
         }
         
@@ -673,14 +719,18 @@
         
         // ========== SERVER CONTROLS ==========
         function toggleServer() {
-            if(!isUsbConnected) { log('⚠️ Connect USB first', 'warning'); showToast('Connect USB first', 'error'); return; }
+            if(!isUsbConnected) { 
+                log('⚠️ Please connect USB first', 'warning'); 
+                showToast('Connect USB first', 'error'); 
+                return; 
+            }
             if(isServerRunning) stopServer();
             else startServer();
         }
         
         function startServer() {
             if(userCredits <= 0 || dailyUsed >= dailyLimit) {
-                showToast(userCredits <=0 ? "No credits" : "Daily limit", 'error');
+                showToast(userCredits <=0 ? "No credits remaining" : "Daily limit reached", 'error');
                 return;
             }
             creditDeductedThisSession = false;
@@ -690,7 +740,8 @@
             else if(meter === 'hpl') CurrentLogic = Logic_HPL;
             else if(meter === 'genus') CurrentLogic = Logic_Genus;
             else CurrentLogic = Logic_MT;
-            CurrentLogic.init?.();
+            
+            if(CurrentLogic.init) CurrentLogic.init();
             CurrentLogic.uiValues = {
                 serial: document.getElementById('val_serial').value || "0000000",
                 kwh: parseFloat(document.getElementById('val_kwh').value) || 0,
@@ -727,7 +778,10 @@
         }
         
         function toggleUsb() {
-            if(isReconnecting) { log('Reconnection in progress', 'warning'); return; }
+            if(isReconnecting) { 
+                log('Reconnection in progress, please wait', 'warning'); 
+                return; 
+            }
             if(isUsbConnected) disconnectUsb();
             else connectUsb();
         }
@@ -739,24 +793,41 @@
         
         async function logout() {
             if(usbHealthInterval) clearInterval(usbHealthInterval);
-            try { if(window.auth && window.auth.signOut) await window.auth.signOut(); } catch(e) {}
+            if(connectionTimeout) clearTimeout(connectionTimeout);
+            try { 
+                if(auth && auth.signOut) await auth.signOut(); 
+            } catch(e) {}
             window.location.href = 'index.html';
         }
         
-        // ========== ANDROID BRIDGE CALLBACKS (called from native WebView) ==========
+        // ========== ANDROID BRIDGE CALLBACKS ==========
         window.onConnected = function(message) {
+            if(connectionTimeout) clearTimeout(connectionTimeout);
             isUsbConnected = true;
             isReconnecting = false;
             reconnectAttempts = 0;
-            updateUsbStatus('connected');
+            
+            // Detect device type from message
+            let deviceType = "USB Device";
+            if(message) {
+                if(message.toLowerCase().includes("ch340")) deviceType = "CH340 Serial";
+                else if(message.toLowerCase().includes("ftdi")) deviceType = "FTDI Serial";
+                else deviceType = message;
+            }
+            window.currentDeviceType = deviceType;
+            
+            updateUsbStatus('connected', deviceType);
             updateServerButton();
-            log('✅ USB bridge established: ' + (message || 'CH340/FTDI active'), 'success');
+            log('✅ USB Connected: ' + deviceType, 'success');
             if(typeof Android !== 'undefined' && Android.vibrate) Android.vibrate(80);
         };
         
         window.onUsbAttached = function() {
-            log('🔌 USB hardware detected', 'info');
-            setTimeout(() => { if(!isUsbConnected) connectUsb(); }, 300);
+            log('🔌 USB cable detected', 'info');
+            showToast('USB detected, connecting...', 'success');
+            setTimeout(() => { 
+                if(!isUsbConnected) connectUsb(); 
+            }, 300);
         };
         
         window.onUsbDetached = function() {
@@ -771,62 +842,94 @@
         };
         
         window.onUsbError = function(err) {
-            log(`❌ USB error: ${err}`, 'error');
+            log(`❌ USB Error: ${err}`, 'error');
             if(isUsbConnected && !isReconnecting) {
                 isUsbConnected = false;
                 attemptReconnect();
             } else if(!isUsbConnected && !isReconnecting && reconnectAttempts === 0) {
                 updateUsbStatus('disconnected');
-                showToast('USB connection failed', 'error');
+                if(connectionTimeout) clearTimeout(connectionTimeout);
             }
         };
         
         window.onUsbPermissionDenied = function() {
-            log('❌ USB permission denied', 'error');
-            showToast('USB access denied', 'error');
+            log('❌ USB permission denied by user', 'error');
+            showToast('USB permission required', 'error');
             updateUsbStatus('disconnected');
+            if(connectionTimeout) clearTimeout(connectionTimeout);
         };
         
         window.onDataReceived = function(hexData) {
             if(!isServerRunning) return;
             lastDataTime = Date.now();
-            // Optional logs for specific commands
+            
             if(hexData.includes("0201020204")) {
                 if(!creditDeductedThisSession) deductCredit();
-                log('📊 Billing data request - credit applied', 'info');
-            } else if(hexData.includes("0100010700")) log('📊 Instant values request', 'info');
-            else if(hexData.includes("5356A2")) log('✅ Reading cycle complete', 'success');
+                log('📊 Billing data - credit applied', 'info');
+            } else if(hexData.includes("0100010700")) {
+                log('📊 Reading instant values', 'info');
+            } else if(hexData.includes("5356A2")) {
+                log('✅ Reading complete', 'success');
+                if(typeof Android !== 'undefined' && Android.vibrate) Android.vibrate(50);
+            }
             
             const reply = CurrentLogic.processPacket(hexData);
             if(reply && typeof Android !== 'undefined' && Android.sendData) {
-                setTimeout(() => { try { Android.sendData(reply); } catch(e) { log('TX error', 'error'); } }, 30);
+                setTimeout(() => { 
+                    try { Android.sendData(reply); } catch(e) { log('Send error: ' + e.message, 'error'); } 
+                }, 30);
             }
         };
         
         window.onLog = function(msg) {
-            if(msg && !msg.includes("RX:") && !msg.includes("TX:")) log(msg.substring(0, 100), 'info');
+            if(msg && !msg.includes("RX:") && !msg.includes("TX:") && !msg.includes("hex") && !msg.includes("byte")) {
+                if(msg.includes("error") || msg.includes("Error")) log(msg.substring(0, 150), 'error');
+                else if(msg.includes("connected") || msg.includes("success")) log(msg.substring(0, 150), 'success');
+            }
         };
         
-        // net guard mock
-        window.initNetGuard = function() {
+        function initNetGuard() {
             setInterval(() => {
                 if(!navigator.onLine) document.getElementById('blackout').classList.add('active');
                 else document.getElementById('blackout').classList.remove('active');
             }, 2000);
-        };
+        }
         
-        // ========== INIT ==========
+        // ========== INITIALIZATION ==========
         window.onload = function() {
+            // Initialize Firebase
+            if(typeof firebase !== 'undefined' && firebase.initializeApp) {
+                try {
+                    firebase.initializeApp(firebaseConfig);
+                    auth = firebase.auth();
+                    db = firebase.firestore();
+                    
+                    auth.onAuthStateChanged(async (user) => {
+                        if(user) {
+                            currentUser = user;
+                            log('✅ User authenticated: ' + user.email, 'success');
+                        } else {
+                            window.location.href = 'index.html';
+                        }
+                    });
+                } catch(e) {
+                    console.log("Firebase init:", e);
+                    log('⚠️ Using demo mode (no Firebase)', 'warning');
+                }
+            } else {
+                log('⚠️ Firebase not loaded, using demo mode', 'warning');
+            }
+            
             CurrentLogic = Logic;
             updateUsbStatus('disconnected');
             updateServerButton();
             document.getElementById('serverStatusText').textContent = 'Server Stopped';
             updateCreditsDisplay();
             initNetGuard();
-            log('🚀 WEBPERA Universal Bridge Active (CH340 + FTDI ready)', 'success');
-            log('📲 Connect your USB meter (supports CH340 / FTDI chips)', 'info');
-            // Auto-attempt if USB already attached
-            setTimeout(() => { if(typeof Android !== 'undefined' && Android.isDeviceAttached) { onUsbAttached(); } }, 500);
+            
+            log('🚀 WEBPERA Universal Bridge Ready', 'success');
+            log('📱 Supports CH340 and FTDI USB devices', 'info');
+            log('💡 Click CONNECT USB to begin', 'info');
         };
     </script>
 </body>
