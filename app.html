@@ -601,965 +601,637 @@
 
     <script>
         // ============================================
-        // UNIVERSAL USB DEVICE SUPPORT
-        // Supports: CH340 (Android Bridge) & FT232R (WebUSB)
-        // ============================================
-
-        // ============================================
-        // DEVICE CONFIGURATIONS
-        // ============================================
-        const USB_DEVICES = {
-            CH340: {
-                type: 'ch340',
-                name: 'CH340',
-                vid: "1A86",
-                pid: "7523",
-                baudRate: 9600,
-                useAndroidBridge: true,
-                useWebUSB: false
-            },
-            FT232R: {
-                type: 'ft232r',
-                name: 'FT232R',
-                vid: "0403",
-                pid: "6001",
-                baudRate: 9600,
-                dataBits: 8,
-                stopBits: 1,
-                parity: "none",
-                useAndroidBridge: false,
-                useWebUSB: true
-            }
-        };
-
-        let currentDeviceType = null; // 'ch340' or 'ft232r'
-        let ft232rDevice = null; // Store FT232R device instance
-
-        // ============================================
-        // APP STATE & GLOBALS
-        // ============================================
-        let isUsbConnected = false;
-        let isServerRunning = false;
-        let isReconnecting = false;
-        let currentUser = null;
-        let userCredits = 0;
-        let dailyLimit = 40;
-        let dailyUsed = 0;
-        let lastResetDate = "";
-        let creditDeductedThisSession = false;
-
-        // USB monitoring
-        let lastDataTime = 0;
-        let usbHealthCheckInterval = null;
-        let reconnectAttempts = 0;
-        const MAX_RECONNECT_ATTEMPTS = 3;
-
-        // Default logic handler (AVON)
-        let CurrentLogic = Logic;
-
-        // ============================================
-        // DOM ELEMENT REFERENCES
-        // ============================================
-        const elements = {
-            creditsDisplay: document.getElementById('creditsDisplay'),
-            dailyDisplay: document.getElementById('dailyDisplay'),
-            usbStatusCard: document.getElementById('usbStatusCard'),
-            usbDot: document.getElementById('usbDot'),
-            usbStatusText: document.getElementById('usbStatusText'),
-            usbStatusSub: document.getElementById('usbStatusSub'),
-            usbSignal: document.getElementById('usbSignal'),
-            btnUsb: document.getElementById('btnUsb'),
-            btnServer: document.getElementById('btnServer'),
-            serverStatus: document.getElementById('serverStatus'),
-            serverStatusText: document.getElementById('serverStatusText'),
-            logBox: document.getElementById('logBox'),
-            creditToast: document.getElementById('creditToast'),
-            blackout: document.getElementById('blackout'),
-            meterSelect: document.getElementById('meterSelect'),
-            valSerial: document.getElementById('val_serial'),
-            valKwh: document.getElementById('val_kwh'),
-            valKvah: document.getElementById('val_kvah'),
-            valMdKw: document.getElementById('val_md_kw'),
-            valMdKva: document.getElementById('val_md_kva')
-        };
-
-        // ============================================
-        // UTILITY FUNCTIONS
-        // ============================================
-        function getTodayDate() {
-            return new Date().toISOString().split('T')[0];
-        }
-
-        function showToast(message, type = 'success') {
-            const toast = elements.creditToast;
-            toast.textContent = message;
-            toast.classList.remove('error', 'warning');
-            if (type === 'error') toast.classList.add('error');
-            if (type === 'warning') toast.classList.add('warning');
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
-        }
-
-        function log(msg, type = '') {
-            const box = elements.logBox;
-            const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            
-            const entry = document.createElement('div');
-            entry.className = `log-entry ${type}`;
-            entry.innerHTML = `<span class="time">[${time}]</span> ${msg}`;
-            
-            box.appendChild(entry);
-            box.scrollTop = box.scrollHeight;
-            
-            while (box.children.length > 100) {
-                box.removeChild(box.firstChild);
-            }
-        }
-
-        function clearLogs() {
-            elements.logBox.innerHTML = '';
-            log('📜 Logs cleared', 'info');
-        }
-
-        function updateUIValues() {
-            CurrentLogic.uiValues.serial = elements.valSerial.value || "0000000";
-            CurrentLogic.uiValues.kwh = parseFloat(elements.valKwh.value) || 0;
-            CurrentLogic.uiValues.kvah = parseFloat(elements.valKvah.value) || 0;
-            CurrentLogic.uiValues.md_kw = parseFloat(elements.valMdKw.value) || 0;
-            CurrentLogic.uiValues.md_kva = parseFloat(elements.valMdKva.value) || 0;
-        }
-
-        function lockConfig(lock) {
-            const inputs = document.querySelectorAll('#configPanel input, #configPanel select');
-            inputs.forEach(el => el.disabled = lock);
-        }
-
-        // ============================================
-        // AUTO DETECT CONNECTED USB DEVICE
-        // ============================================
-        async function autoDetectUSBDevice() {
-            log('🔍 Scanning for USB devices...', 'info');
-            
-            // Check for Android Bridge (CH340)
-            if (window.Android && typeof Android.isDeviceConnected === 'function') {
-                try {
-                    const isConnected = Android.isDeviceConnected();
-                    if (isConnected) {
-                        log('✅ CH340 detected via Android Bridge', 'success');
-                        currentDeviceType = 'ch340';
-                        return USB_DEVICES.CH340;
-                    }
-                } catch(e) {}
-            }
-
-            // Check for WebUSB (FT232R)
-            if (navigator.usb) {
-                try {
-                    const devices = await navigator.usb.getDevices();
-                    
-                    // Check for FT232R
-                    const ft232rFound = devices.find(device => 
-                        device.vendorId === parseInt(USB_DEVICES.FT232R.vid, 16) && 
-                        device.productId === parseInt(USB_DEVICES.FT232R.pid, 16)
-                    );
-                    
-                    if (ft232rFound) {
-                        log('✅ FT232R detected via WebUSB', 'success');
-                        currentDeviceType = 'ft232r';
-                        return USB_DEVICES.FT232R;
-                    }
-                    
-                    // Check for other devices (optional)
-                    if (devices.length > 0) {
-                        devices.forEach(device => {
-                            log(`ℹ️ Found USB device: VID:${device.vendorId.toString(16)} PID:${device.productId.toString(16)}`, 'info');
-                        });
-                    }
-                } catch(e) {
-                    console.error('WebUSB detection error:', e);
-                }
-            }
-            
-            log('⚠️ No USB device detected. Please connect CH340 or FT232R meter.', 'warning');
-            return null;
-        }
-
-        // ============================================
-        // FT232R SPECIFIC FUNCTIONS (WebUSB)
-        // ============================================
-        async function connectFT232R() {
-            try {
-                if (!navigator.usb) {
-                    throw new Error('WebUSB not supported in this browser');
-                }
-
-                // Request FT232R device
-                const device = await navigator.usb.requestDevice({
-                    filters: [
-                        {
-                            vendorId: parseInt(USB_DEVICES.FT232R.vid, 16),
-                            productId: parseInt(USB_DEVICES.FT232R.pid, 16)
-                        }
-                    ]
-                });
-
-                ft232rDevice = device;
-                
-                // Open the device
-                await device.open();
-                
-                // Select configuration
-                if (device.configuration === null) {
-                    await device.selectConfiguration(1);
-                }
-                
-                // Claim interface
-                await device.claimInterface(0);
-                
-                // Set serial port parameters for FT232R
-                await device.controlTransferOut({
-                    requestType: 'class',
-                    recipient: 'interface',
-                    request: 0x22,  // SET_LINE_CODING
-                    value: 0,
-                    index: 0
-                }, new Uint8Array([
-                    USB_DEVICES.FT232R.baudRate & 0xFF,
-                    (USB_DEVICES.FT232R.baudRate >> 8) & 0xFF,
-                    (USB_DEVICES.FT232R.baudRate >> 16) & 0xFF,
-                    (USB_DEVICES.FT232R.baudRate >> 24) & 0xFF,
-                    0,  // stop bits (1 stop bit)
-                    0,  // parity (none)
-                    8   // data bits (8)
-                ]));
-                
-                // Set RTS/DTR for FT232R
-                await device.controlTransferOut({
-                    requestType: 'class',
-                    recipient: 'interface',
-                    request: 0x21,  // SET_CONTROL_LINE_STATE
-                    value: 0x0003,  // RTS | DTR
-                    index: 0
-                });
-                
-                // Start reading data
-                readFT232RData(device);
-                
-                isUsbConnected = true;
-                currentDeviceType = 'ft232r';
-                updateUsbStatus('connected');
-                updateServerButton();
-                log(`✅ FT232R Connected at ${USB_DEVICES.FT232R.baudRate} baud`, 'success');
-                
-                try { if (window.Android) Android.vibrate(100); } catch(e) {}
-                
-                return true;
-                
-            } catch (error) {
-                if (error.name === 'NotFoundError') {
-                    log('❌ FT232R device not found. Please connect the USB meter.', 'error');
-                } else if (error.name === 'SecurityError') {
-                    log('❌ USB permission denied. Please allow access.', 'error');
-                } else {
-                    log(`❌ FT232R connection error: ${error.message}`, 'error');
-                }
-                return false;
-            }
-        }
-
-        async function readFT232RData(device) {
-            let endpointIn = null;
-            
-            for (const endpoint of device.configuration.interfaces[0].alternate.endpoints) {
-                if (endpoint.direction === 'in') {
-                    endpointIn = endpoint;
-                    break;
-                }
-            }
-            
-            if (!endpointIn) {
-                log('❌ No input endpoint found on FT232R', 'error');
-                return;
-            }
-            
-            while (isUsbConnected && device.opened) {
-                try {
-                    const result = await device.transferIn(endpointIn.endpointNumber, 64);
-                    const decoder = new TextDecoder();
-                    const data = decoder.decode(result.data);
-                    
-                    if (data && data.length > 0) {
-                        const hexData = arrayBufferToHex(result.data.buffer);
-                        lastDataTime = Date.now();
-                        processReceivedData(hexData, data);
-                    }
-                } catch (error) {
-                    if (error.name !== 'NetworkError') {
-                        log(`FT232R read error: ${error.message}`, 'error');
-                    }
-                    break;
-                }
-            }
-        }
-
-        async function sendFT232RData(device, data) {
-            if (!device || !device.opened) return false;
-            
-            try {
-                let endpointOut = null;
-                
-                for (const endpoint of device.configuration.interfaces[0].alternate.endpoints) {
-                    if (endpoint.direction === 'out') {
-                        endpointOut = endpoint;
-                        break;
-                    }
-                }
-                
-                if (!endpointOut) {
-                    log('❌ No output endpoint found on FT232R', 'error');
-                    return false;
-                }
-                
-                const encoder = new TextEncoder();
-                const encodedData = encoder.encode(data);
-                
-                await device.transferOut(endpointOut.endpointNumber, encodedData);
-                return true;
-                
-            } catch (error) {
-                log(`FT232R send error: ${error.message}`, 'error');
-                return false;
-            }
-        }
-
-        function disconnectFT232R() {
-            if (ft232rDevice && ft232rDevice.opened) {
-                try {
-                    ft232rDevice.close();
-                } catch(e) {}
-            }
-            ft232rDevice = null;
-        }
-
-        // ============================================
-        // CH340 SPECIFIC FUNCTIONS (Android Bridge)
-        // ============================================
-        function connectCH340() {
-            log('🔌 Connecting CH340 via Android Bridge...', 'info');
-            
-            try {
-                if (window.Android && window.Android.connectUSB) {
-                    window.Android.connectUSB();
-                    currentDeviceType = 'ch340';
-                    log('✅ CH340 connection initiated', 'info');
-                } else {
-                    throw new Error('Android bridge not available');
-                }
-            } catch(e) {
-                log('❌ CH340 connection failed - Android bridge not found', 'error');
-                updateUsbStatus('disconnected');
-            }
-        }
-
-        function disconnectCH340() {
-            try {
-                if (window.Android && window.Android.disconnect) {
-                    window.Android.disconnect();
-                }
-            } catch(e) {}
-        }
-
-        function sendCH340Data(data) {
-            try {
-                if (window.Android && window.Android.sendData) {
-                    window.Android.sendData(data);
-                }
-            } catch(e) {
-                log('❌ Failed to send data via CH340', 'error');
-            }
-        }
-
-        // ============================================
-        // UNIVERSAL USB CONNECTION HANDLERS
-        // ============================================
-        async function connectUsb() {
-            log('🔍 Detecting USB device type...', 'info');
-            updateUsbStatus('connecting');
-            
-            // First, try to auto-detect
-            const detectedDevice = await autoDetectUSBDevice();
-            
-            if (detectedDevice && detectedDevice.type === 'ft232r') {
-                // Connect FT232R via WebUSB
-                await connectFT232R();
-            } else if (detectedDevice && detectedDevice.type === 'ch340') {
-                // Connect CH340 via Android Bridge
-                connectCH340();
-            } else {
-                // No device detected, ask user to select or connect manually
-                log('⚠️ No device auto-detected. Please ensure USB is connected.', 'warning');
-                showToast('Please connect USB meter and try again', 'warning');
-                updateUsbStatus('disconnected');
-                
-                // Fallback: Try Android Bridge anyway (for CH340)
-                if (window.Android) {
-                    log('🔄 Trying Android Bridge fallback...', 'info');
-                    connectCH340();
-                } else if (navigator.usb) {
-                    log('🔄 Trying WebUSB fallback...', 'info');
-                    await connectFT232R();
-                }
-            }
-        }
-
-        function disconnectUsb() {
-            if (isServerRunning) {
-                stopServer();
-            }
-            
-            stopUsbHealthCheck();
-            
-            if (currentDeviceType === 'ch340') {
-                disconnectCH340();
-            } else if (currentDeviceType === 'ft232r') {
-                disconnectFT232R();
-            }
-            
-            isUsbConnected = false;
-            isReconnecting = false;
-            reconnectAttempts = 0;
-            currentDeviceType = null;
-            updateUsbStatus('disconnected');
-            updateServerButton();
-            log('🔌 USB Disconnected', 'warning');
-        }
-
-        function toggleUsb() {
-            if (isReconnecting) {
-                log('⏳ Reconnection in progress...', 'warning');
-                return;
-            }
-            
-            if (isUsbConnected) {
-                disconnectUsb();
-            } else {
-                connectUsb();
-            }
-        }
-
-        // ============================================
-        // DATA PROCESSING (Universal)
-        // ============================================
-        function arrayBufferToHex(buffer) {
-            const bytes = new Uint8Array(buffer);
-            let hex = '';
-            for (let i = 0; i < bytes.length; i++) {
-                hex += bytes[i].toString(16).padStart(2, '0').toUpperCase();
-            }
-            return hex;
-        }
-
-        function processReceivedData(hexData, textData) {
-            if (!isServerRunning) return;
-            
-            lastDataTime = Date.now();
-
-            // Detect request type and show simple status
-            if (hexData.includes("935A64")) {
-                log('🔄 Connection request received...', 'info');
-            } else if (hexData.includes("A041034110") || hexData.includes("A044034110")) {
-                log('🔄 Authentication in progress...', 'info');
-            } else if (hexData.includes("0100010800")) {
-                log('📊 Reading meter clock...', 'info');
-            } else if (hexData.includes("0100600100")) {
-                log('📊 Reading meter serial...', 'info');
-            } else if (hexData.includes("0201020204")) {
-                log('📊 Reading billing data...', 'info');
-                
-                if (!creditDeductedThisSession) {
-                    const success = deductCredit();
-                    if (success !== false) {
-                        creditDeductedThisSession = true;
-                    }
-                }
-            } else if (hexData.includes("0100010700") || hexData.includes("0100030700")) {
-                log('📊 Reading instant values...', 'info');
-            } else if (hexData.includes("5356A2")) {
-                log('✅ Reading Complete!', 'success');
-                
-                try { if (window.Android) Android.vibrate(100); } catch(e) {}
-            }
-
-            // Process and send response
-            const reply = CurrentLogic.processPacket(hexData);
-            if (reply) {
-                setTimeout(() => {
-                    if (currentDeviceType === 'ch340') {
-                        sendCH340Data(reply);
-                    } else if (currentDeviceType === 'ft232r' && ft232rDevice && ft232rDevice.opened) {
-                        sendFT232RData(ft232rDevice, reply);
-                    }
-                }, 50);
-            }
-        }
-
-        // ============================================
-        // USB STATUS UI UPDATES
-        // ============================================
-        function updateUsbStatus(status) {
-            const card = elements.usbStatusCard;
-            const dot = elements.usbDot;
-            const text = elements.usbStatusText;
-            const sub = elements.usbStatusSub;
-            const signal = elements.usbSignal;
-            const btn = elements.btnUsb;
-
-            card.classList.remove('connected', 'reconnecting');
-            dot.classList.remove('connected', 'reconnecting');
-            btn.classList.remove('connected', 'reconnecting');
-
-            const deviceName = currentDeviceType === 'ch340' ? 'CH340' : (currentDeviceType === 'ft232r' ? 'FT232R' : 'USB');
-
-            switch(status) {
-                case 'connected':
-                    card.classList.add('connected');
-                    dot.classList.add('connected');
-                    btn.classList.add('connected');
-                    text.textContent = `✅ ${deviceName} Connected`;
-                    sub.textContent = `${deviceName} • 9600 baud • Ready`;
-                    signal.textContent = '● Active';
-                    signal.style.color = '#00e676';
-                    btn.textContent = '🔌 DISCONNECT USB';
-                    break;
-                    
-                case 'reconnecting':
-                    card.classList.add('reconnecting');
-                    dot.classList.add('reconnecting');
-                    btn.classList.add('reconnecting');
-                    text.textContent = `🔄 Reconnecting ${deviceName}...`;
-                    sub.textContent = `Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`;
-                    signal.textContent = '● Weak';
-                    signal.style.color = '#ff9800';
-                    btn.textContent = '⏳ RECONNECTING...';
-                    break;
-                    
-                case 'connecting':
-                    text.textContent = '🔌 Connecting USB...';
-                    sub.textContent = 'Detecting device type...';
-                    signal.textContent = '';
-                    btn.textContent = '⏳ CONNECTING...';
-                    break;
-                    
-                case 'disconnected':
-                default:
-                    text.textContent = '❌ No USB Device Connected';
-                    sub.textContent = 'Connect CH340 or FT232R meter';
-                    signal.textContent = '';
-                    btn.textContent = '🔌 CONNECT USB';
-                    currentDeviceType = null;
-                    break;
-            }
-        }
-
-        // ============================================
-        // USB HEALTH CHECK
-        // ============================================
-        function startUsbHealthCheck() {
-            stopUsbHealthCheck();
-            
-            lastDataTime = Date.now();
-            
-            usbHealthCheckInterval = setInterval(() => {
-                if (!isUsbConnected || !isServerRunning) return;
-                
-                const timeSinceData = Date.now() - lastDataTime;
-                const signal = elements.usbSignal;
-                
-                if (timeSinceData < 5000) {
-                    signal.textContent = '● Active';
-                    signal.style.color = '#00e676';
-                } else if (timeSinceData < 15000) {
-                    signal.textContent = '● Idle';
-                    signal.style.color = '#888';
-                } else {
-                    signal.textContent = '● Waiting...';
-                    signal.style.color = '#ff9800';
-                }
-            }, 2000);
-        }
-
-        function stopUsbHealthCheck() {
-            if (usbHealthCheckInterval) {
-                clearInterval(usbHealthCheckInterval);
-                usbHealthCheckInterval = null;
-            }
-        }
-
-        // ============================================
-        // CREDIT MANAGEMENT
-        // ============================================
-        function updateCreditsDisplay() {
-            const totalDisplay = elements.creditsDisplay;
-            const dailyDisplayElem = elements.dailyDisplay;
-            
-            totalDisplay.textContent = `Credits: ${userCredits}`;
-            totalDisplay.classList.remove('low', 'critical');
-            if (userCredits <= 10) totalDisplay.classList.add('critical');
-            else if (userCredits <= 50) totalDisplay.classList.add('low');
-
-            const remaining = dailyLimit - dailyUsed;
-            dailyDisplayElem.textContent = `Today: ${dailyUsed}/${dailyLimit}`;
-        }
-
-        function canUseCredit() {
-            if (userCredits <= 0) return { allowed: false, reason: "Subscription Expired" };
-            if (dailyUsed >= dailyLimit) return { allowed: false, reason: "Daily limit reached!" };
-            return { allowed: true, reason: "" };
-        }
-
-        async function deductCredit() {
-            if (!currentUser) {
-                log('❌ No user logged in', 'error');
-                return false;
-            }
-
-            if (creditDeductedThisSession) {
-                return false;
-            }
-
-            const check = canUseCredit();
-            if (!check.allowed) {
-                showToast(check.reason, 'error');
-                log(`❌ ${check.reason}`, 'error');
-                
-                if (check.reason === "Subscription Expired") {
-                    setTimeout(async () => {
-                        await auth.signOut();
-                        window.location.href = 'index.html';
-                    }, 2000);
-                }
-                return false;
-            }
-
-            try {
-                const today = getTodayDate();
-                
-                await db.collection('users').doc(currentUser.uid).update({
-                    credits: firebase.firestore.FieldValue.increment(-1),
-                    dailyUsed: firebase.firestore.FieldValue.increment(1),
-                    lastResetDate: today,
-                    lastReading: firebase.firestore.FieldValue.serverTimestamp()
-                });
-
-                userCredits--;
-                dailyUsed++;
-                updateCreditsDisplay();
-                showToast(`💳 Credit Used | Today: ${dailyUsed}/${dailyLimit} | Total: ${userCredits}`, 'success');
-                log(`💳 Credit Deducted - Today: ${dailyUsed}/${dailyLimit} | Total: ${userCredits}`, 'credit');
-
-                if (userCredits <= 0) {
-                    log('⚠️ Credits exhausted! Logging out...', 'error');
-                    setTimeout(async () => {
-                        await auth.signOut();
-                        window.location.href = 'index.html';
-                    }, 2000);
-                }
-                
-                return true;
-
-            } catch (error) {
-                console.error('Error deducting credit:', error);
-                log('❌ Credit deduction failed - check internet', 'error');
-                return false;
-            }
-        }
-
-        // ============================================
-        // USER DATA & AUTHENTICATION
-        // ============================================
-        async function loadUserData() {
-            try {
-                const doc = await db.collection('users').doc(currentUser.uid).get();
-                if (doc.exists) {
-                    const data = doc.data();
-                    userCredits = data.credits || 0;
-                    dailyLimit = data.dailyLimit || 40;
-                    dailyUsed = data.dailyUsed || 0;
-                    lastResetDate = data.lastResetDate || "";
-
-                    const today = getTodayDate();
-                    if (lastResetDate !== today) {
-                        dailyUsed = 0;
-                        lastResetDate = today;
-                        await db.collection('users').doc(currentUser.uid).update({
-                            dailyUsed: 0,
-                            lastResetDate: today
-                        });
-                    }
-                    updateCreditsDisplay();
-                }
-            } catch (error) {
-                console.error('Error loading user data:', error);
-            }
-        }
-
-        async function logout() {
-            stopUsbHealthCheck();
-            disconnectUsb();
-            try {
-                await auth.signOut();
-                window.location.href = 'index.html';
-            } catch (error) {
-                console.error('Logout error:', error);
-            }
-        }
-
-        // ============================================
-        // SERVER FUNCTIONS
-        // ============================================
-        function updateServerButton() {
-            const btn = elements.btnServer;
-            btn.classList.remove('ready', 'running');
-
-            if (!isUsbConnected) {
-                btn.textContent = '▶️ START SERVER';
-            } else if (isServerRunning) {
-                btn.textContent = '⏹️ STOP SERVER';
-                btn.classList.add('running');
-            } else {
-                btn.textContent = '▶️ START SERVER';
-                btn.classList.add('ready');
-            }
-        }
-
-        function updateServerStatus() {
-            const status = elements.serverStatus;
-            const text = elements.serverStatusText;
-            
-            status.classList.remove('running');
-            
-            if (isServerRunning) {
-                status.classList.add('running');
-                text.textContent = '🟢 Server Running - Ready for Reading';
-            } else {
-                text.textContent = 'Server Stopped';
-            }
-        }
-
-        function startServer() {
-            const check = canUseCredit();
-            if (!check.allowed) {
-                showToast(check.reason, 'error');
-                log(`❌ ${check.reason}`, 'error');
-                return;
-            }
-
-            creditDeductedThisSession = false;
-
-            const meterType = elements.meterSelect.value;
-            if (meterType === 'avon') {
-                CurrentLogic = Logic;
-            } else if (meterType === 'avon2') {
-                CurrentLogic = Logic_Avon2;
-            } else if (meterType === 'hpl') {
-                CurrentLogic = Logic_HPL;
-            } else if (meterType === 'genus') {
-                CurrentLogic = Logic_Genus;
-            } else {
-                CurrentLogic = Logic_MT;
-            }
-
-            CurrentLogic.init();
-            updateUIValues();
-
-            isServerRunning = true;
-            updateServerButton();
-            updateServerStatus();
-            lockConfig(true);
-            startUsbHealthCheck();
-
-            const meterName = meterType.toUpperCase();
-            const deviceName = currentDeviceType === 'ch340' ? 'CH340' : (currentDeviceType === 'ft232r' ? 'FT232R' : 'USB');
-            log(`▶️ Server Started (${meterName} on ${deviceName})`, 'success');
-            log('📡 Waiting for meter reading request...', 'info');
-        }
-
-        function stopServer() {
-            isServerRunning = false;
-            creditDeductedThisSession = false;
-            
-            stopUsbHealthCheck();
-            updateServerButton();
-            updateServerStatus();
-            lockConfig(false);
-            log('⏹️ Server Stopped', 'warning');
-        }
-
-        function toggleServer() {
-            if (!isUsbConnected) {
-                log('⚠️ Connect USB first!', 'warning');
-                showToast('Connect USB meter first!', 'warning');
-                return;
-            }
-
-            if (isServerRunning) {
-                stopServer();
-            } else {
-                startServer();
-            }
-        }
-
-        // ============================================
-        // ANDROID BRIDGE CALLBACKS (for CH340)
-        // ============================================
-        function onConnected(message) {
-            if (currentDeviceType === 'ch340' || !currentDeviceType) {
-                isUsbConnected = true;
-                isReconnecting = false;
-                reconnectAttempts = 0;
-                currentDeviceType = 'ch340';
-                updateUsbStatus('connected');
-                updateServerButton();
-                log('✅ CH340 Connected Successfully', 'success');
-                try { if (window.Android) Android.vibrate(100); } catch(e) {}
-            }
-        }
-
-        function onUsbAttached() {
-            log('🔌 USB Cable Detected', 'info');
-            showToast('USB Detected - Connecting...', 'success');
-            
-            setTimeout(() => {
-                if (!isUsbConnected) {
-                    connectUsb();
-                }
-            }, 500);
-        }
-
-        function onUsbDetached() {
-            log('⚠️ USB Disconnected!', 'error');
-            showToast('USB Disconnected!', 'error');
-            
-            const wasRunning = isServerRunning;
-            
-            isUsbConnected = false;
-            isServerRunning = false;
-            updateUsbStatus('disconnected');
-            updateServerButton();
-            updateServerStatus();
-            stopUsbHealthCheck();
-            
-            try { if (window.Android) Android.vibrate(200); } catch(e) {}
-            
-            if (wasRunning) {
-                log('⏹️ Server stopped due to USB disconnect', 'warning');
-            }
-        }
-
-        function onUsbError(errorMessage) {
-            log(`❌ USB Error: ${errorMessage}`, 'error');
-            
-            if (isUsbConnected && !isReconnecting) {
-                isUsbConnected = false;
-                attemptReconnect();
-            } else if (isReconnecting) {
-                setTimeout(attemptReconnect, 2000);
-            } else {
-                updateUsbStatus('disconnected');
-                showToast('USB Connection Failed - ' + errorMessage, 'error');
-            }
-        }
-
-        function onUsbPermissionDenied() {
-            log('❌ USB Permission Denied - Please allow access', 'error');
-            showToast('Please allow USB access!', 'error');
-            updateUsbStatus('disconnected');
-        }
-
-        function onDataReceived(hexData) {
-            processReceivedData(hexData, "");
-        }
-
-        function onLog(message) {
-            if (message.includes("RX:") || message.includes("TX:")) return;
-            if (message.includes("hex") || message.includes("byte")) return;
-            
-            if (message.includes("error") || message.includes("Error")) {
-                log(`❌ ${message}`, 'error');
-            }
-        }
-
-        // ============================================
-        // RECONNECT LOGIC
-        // ============================================
-        function attemptReconnect() {
-            if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
-                log('❌ Reconnection failed after 3 attempts', 'error');
-                showToast('USB Connection Lost - Please reconnect manually', 'error');
-                isReconnecting = false;
-                reconnectAttempts = 0;
-                updateUsbStatus('disconnected');
-                updateServerButton();
-                return;
-            }
-            
-            reconnectAttempts++;
-            isReconnecting = true;
-            updateUsbStatus('reconnecting');
-            log(`🔄 Reconnect attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}...`, 'warning');
-            
-            setTimeout(() => {
-                connectUsb();
-            }, 2000);
-        }
-
-        // ============================================
-        // NET GUARD (Placeholder)
-        // ============================================
-        function initNetGuard() {
-            console.log('Net guard initialized for universal USB');
-        }
-
-        // ============================================
-        // INITIALIZATION
-        // ============================================
-        async function initApp() {
-            CurrentLogic = Logic;
-            CurrentLogic.init();
-            updateUsbStatus('disconnected');
-            updateServerStatus();
-            initNetGuard();
-            
-            // Auto-detect on load
-            const detected = await autoDetectUSBDevice();
-            if (detected) {
-                log(`ℹ️ Detected: ${detected.name} (${detected.type.toUpperCase()})`, 'info');
-            }
-            
-            log('🚀 Universal USB Server Ready', 'success');
-            log('📱 Supports: CH340 (Android Bridge) & FT232R (WebUSB)', 'info');
-            log('🔌 Connect USB meter to begin', 'info');
-        }
-
-        // Firebase initialization
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-
-        // Check authentication
-        auth.onAuthStateChanged(async (user) => {
-            if (user) {
-                currentUser = user;
-                await loadUserData();
-                if (userCredits <= 0) {
-                    await auth.signOut();
-                    window.location.href = 'index.html';
-                }
-                initApp();
-            } else {
-                window.location.href = 'index.html';
-            }
-        });
+		// UNIVERSAL USB DEVICE SUPPORT - FIXED VERSION
+		// Supports: CH340 (Android Bridge) & FT232R (WebUSB)
+		// ============================================
+		
+		// ============================================
+		// DEVICE CONFIGURATIONS
+		// ============================================
+		const USB_DEVICES = {
+			CH340: {
+				type: 'ch340',
+				name: 'CH340',
+				vid: "1A86",
+				pid: "7523",
+				baudRate: 9600,
+				useAndroidBridge: true,
+				useWebUSB: false
+			},
+			FT232R: {
+				type: 'ft232r',
+				name: 'FT232R',
+				vid: "0403",
+				pid: "6001",
+				baudRate: 9600,
+				dataBits: 8,
+				stopBits: 1,
+				parity: "none",
+				useAndroidBridge: false,
+				useWebUSB: true
+			}
+		};
+		
+		let currentDeviceType = null; // 'ch340' or 'ft232r'
+		let ft232rDevice = null;
+		let isConnectingFT232R = false; // Flag to track FT232R connection attempt
+		
+		// ============================================
+		// ANDROID BRIDGE CALLBACKS (Modified for CH340 only)
+		// ============================================
+		function onConnected(message) {
+			// CRITICAL FIX: Only process if we're expecting CH340 or no device is set
+			// AND we're NOT in the middle of FT232R connection
+			if (!isConnectingFT232R && (currentDeviceType === 'ch340' || !currentDeviceType)) {
+				isUsbConnected = true;
+				isReconnecting = false;
+				reconnectAttempts = 0;
+				currentDeviceType = 'ch340';
+				updateUsbStatus('connected');
+				updateServerButton();
+				log('✅ CH340 Connected Successfully', 'success');
+				try { if (window.Android) Android.vibrate(100); } catch(e) {}
+			} else if (isConnectingFT232R) {
+				// This is a false positive from Android bridge, ignore it
+				log('⚠️ Ignoring Android bridge signal while connecting FT232R', 'warning');
+			}
+		}
+		
+		function onUsbAttached() {
+			// Don't auto-connect if we're already connecting FT232R
+			if (!isConnectingFT232R) {
+				log('🔌 USB Cable Detected', 'info');
+				showToast('USB Detected - Connecting...', 'success');
+				
+				setTimeout(() => {
+					if (!isUsbConnected && !isConnectingFT232R) {
+						connectUsb();
+					}
+				}, 500);
+			}
+		}
+		
+		function onUsbDetached() {
+			// Only handle if current device is CH340
+			if (currentDeviceType === 'ch340') {
+				log('⚠️ CH340 Disconnected!', 'error');
+				showToast('CH340 Disconnected!', 'error');
+				
+				const wasRunning = isServerRunning;
+				
+				isUsbConnected = false;
+				isServerRunning = false;
+				updateUsbStatus('disconnected');
+				updateServerButton();
+				updateServerStatus();
+				stopUsbHealthCheck();
+				
+				try { if (window.Android) Android.vibrate(200); } catch(e) {}
+				
+				if (wasRunning) {
+					log('⏹️ Server stopped due to USB disconnect', 'warning');
+				}
+				currentDeviceType = null;
+			}
+		}
+		
+		function onUsbError(errorMessage) {
+			// Only handle if current device is CH340 or no device
+			if (currentDeviceType === 'ch340' || !currentDeviceType) {
+				log(`❌ CH340 Error: ${errorMessage}`, 'error');
+				
+				if (isUsbConnected && !isReconnecting) {
+					isUsbConnected = false;
+					attemptReconnect();
+				} else if (isReconnecting) {
+					setTimeout(attemptReconnect, 2000);
+				} else {
+					updateUsbStatus('disconnected');
+					showToast('CH340 Connection Failed - ' + errorMessage, 'error');
+				}
+			}
+		}
+		
+		function onUsbPermissionDenied() {
+			log('❌ USB Permission Denied - Please allow access', 'error');
+			showToast('Please allow USB access!', 'error');
+			updateUsbStatus('disconnected');
+		}
+		
+		function onDataReceived(hexData) {
+			// Process data regardless of device type
+			processReceivedData(hexData, "");
+		}
+		
+		function onLog(message) {
+			if (message.includes("RX:") || message.includes("TX:")) return;
+			if (message.includes("hex") || message.includes("byte")) return;
+			
+			if (message.includes("error") || message.includes("Error")) {
+				log(`❌ ${message}`, 'error');
+			}
+		}
+		
+		// ============================================
+		// FT232R SPECIFIC FUNCTIONS (WebUSB)
+		// ============================================
+		async function connectFT232R() {
+			isConnectingFT232R = true;
+			
+			try {
+				if (!navigator.usb) {
+					throw new Error('WebUSB not supported in this browser');
+				}
+		
+				log('🔌 Requesting FT232R device...', 'info');
+				
+				// Request FT232R device
+				const device = await navigator.usb.requestDevice({
+					filters: [
+						{
+							vendorId: parseInt(USB_DEVICES.FT232R.vid, 16),
+							productId: parseInt(USB_DEVICES.FT232R.pid, 16)
+						}
+					]
+				});
+		
+				ft232rDevice = device;
+				
+				log('📡 Opening FT232R device...', 'info');
+				
+				// Open the device
+				await device.open();
+				
+				// Select configuration
+				if (device.configuration === null) {
+					await device.selectConfiguration(1);
+				}
+				
+				// Claim interface
+				await device.claimInterface(0);
+				
+				log('⚙️ Configuring FT232R serial parameters...', 'info');
+				
+				// Set serial port parameters for FT232R
+				await device.controlTransferOut({
+					requestType: 'class',
+					recipient: 'interface',
+					request: 0x22,  // SET_LINE_CODING
+					value: 0,
+					index: 0
+				}, new Uint8Array([
+					USB_DEVICES.FT232R.baudRate & 0xFF,
+					(USB_DEVICES.FT232R.baudRate >> 8) & 0xFF,
+					(USB_DEVICES.FT232R.baudRate >> 16) & 0xFF,
+					(USB_DEVICES.FT232R.baudRate >> 24) & 0xFF,
+					0,  // stop bits (1 stop bit)
+					0,  // parity (none)
+					8   // data bits (8)
+				]));
+				
+				// Set RTS/DTR for FT232R
+				await device.controlTransferOut({
+					requestType: 'class',
+					recipient: 'interface',
+					request: 0x21,  // SET_CONTROL_LINE_STATE
+					value: 0x0003,  // RTS | DTR
+					index: 0
+				});
+				
+				log('📖 Starting FT232R data reader...', 'info');
+				
+				// Start reading data
+				readFT232RData(device);
+				
+				isUsbConnected = true;
+				currentDeviceType = 'ft232r';
+				updateUsbStatus('connected');
+				updateServerButton();
+				log(`✅ FT232R Connected Successfully at ${USB_DEVICES.FT232R.baudRate} baud`, 'success');
+				
+				try { if (window.Android) Android.vibrate(100); } catch(e) {}
+				
+				isConnectingFT232R = false;
+				return true;
+				
+			} catch (error) {
+				isConnectingFT232R = false;
+				
+				if (error.name === 'NotFoundError') {
+					log('❌ FT232R device not found. Please ensure USB meter is connected.', 'error');
+					showToast('FT232R not found - Please connect USB meter', 'error');
+				} else if (error.name === 'SecurityError') {
+					log('❌ USB permission denied. Please allow access to FT232R device.', 'error');
+					showToast('Please allow FT232R USB access!', 'error');
+				} else {
+					log(`❌ FT232R connection error: ${error.message}`, 'error');
+					showToast(`FT232R Error: ${error.message}`, 'error');
+				}
+				updateUsbStatus('disconnected');
+				return false;
+			}
+		}
+		
+		async function readFT232RData(device) {
+			let endpointIn = null;
+			
+			// Find input endpoint
+			for (const endpoint of device.configuration.interfaces[0].alternate.endpoints) {
+				if (endpoint.direction === 'in') {
+					endpointIn = endpoint;
+					break;
+				}
+			}
+			
+			if (!endpointIn) {
+				log('❌ No input endpoint found on FT232R', 'error');
+				return;
+			}
+			
+			log('📡 FT232R reader active, waiting for data...', 'info');
+			
+			while (isUsbConnected && currentDeviceType === 'ft232r' && device.opened) {
+				try {
+					const result = await device.transferIn(endpointIn.endpointNumber, 64);
+					
+					if (result.data && result.data.byteLength > 0) {
+						const hexData = arrayBufferToHex(result.data.buffer);
+						const decoder = new TextDecoder();
+						const textData = decoder.decode(result.data);
+						
+						lastDataTime = Date.now();
+						
+						// Log received data for debugging (optional)
+						if (hexData.length > 0) {
+							// console.log(`FT232R RX: ${hexData}`);
+							processReceivedData(hexData, textData);
+						}
+					}
+				} catch (error) {
+					if (error.name !== 'NetworkError') {
+						log(`FT232R read error: ${error.message}`, 'error');
+					}
+					break;
+				}
+			}
+			
+			log('📡 FT232R reader stopped', 'info');
+		}
+		
+		async function sendFT232RData(device, data) {
+			if (!device || !device.opened || currentDeviceType !== 'ft232r') return false;
+			
+			try {
+				let endpointOut = null;
+				
+				// Find output endpoint
+				for (const endpoint of device.configuration.interfaces[0].alternate.endpoints) {
+					if (endpoint.direction === 'out') {
+						endpointOut = endpoint;
+						break;
+					}
+				}
+				
+				if (!endpointOut) {
+					log('❌ No output endpoint found on FT232R', 'error');
+					return false;
+				}
+				
+				const encoder = new TextEncoder();
+				const encodedData = encoder.encode(data);
+				
+				await device.transferOut(endpointOut.endpointNumber, encodedData);
+				// console.log(`FT232R TX: ${data}`);
+				return true;
+				
+			} catch (error) {
+				log(`FT232R send error: ${error.message}`, 'error');
+				return false;
+			}
+		}
+		
+		function disconnectFT232R() {
+			if (ft232rDevice && ft232rDevice.opened) {
+				try {
+					ft232rDevice.close();
+					log('🔌 FT232R device closed', 'info');
+				} catch(e) {
+					console.error('Error closing FT232R:', e);
+				}
+			}
+			ft232rDevice = null;
+		}
+		
+		// ============================================
+		// CH340 SPECIFIC FUNCTIONS (Android Bridge)
+		// ============================================
+		function connectCH340() {
+			log('🔌 Connecting CH340 via Android Bridge...', 'info');
+			updateUsbStatus('connecting');
+			currentDeviceType = 'ch340';
+			
+			try {
+				if (window.Android && window.Android.connectUSB) {
+					window.Android.connectUSB();
+					log('✅ CH340 connection initiated', 'info');
+				} else {
+					throw new Error('Android bridge not available');
+				}
+			} catch(e) {
+				log('❌ CH340 connection failed - Android bridge not found', 'error');
+				updateUsbStatus('disconnected');
+				currentDeviceType = null;
+			}
+		}
+		
+		function disconnectCH340() {
+			try {
+				if (window.Android && window.Android.disconnect) {
+					window.Android.disconnect();
+				}
+			} catch(e) {}
+		}
+		
+		function sendCH340Data(data) {
+			try {
+				if (window.Android && window.Android.sendData) {
+					window.Android.sendData(data);
+				}
+			} catch(e) {
+				log('❌ Failed to send data via CH340', 'error');
+			}
+		}
+		
+		// ============================================
+		// UNIVERSAL USB CONNECTION HANDLERS (UPDATED)
+		// ============================================
+		async function connectUsb() {
+			if (isUsbConnected) {
+				log('⚠️ USB already connected', 'warning');
+				return;
+			}
+			
+			log('🔍 Detecting USB device type...', 'info');
+			updateUsbStatus('connecting');
+			
+			// First, try WebUSB for FT232R
+			if (navigator.usb) {
+				log('🔍 Checking for FT232R via WebUSB...', 'info');
+				try {
+					const devices = await navigator.usb.getDevices();
+					const ft232rFound = devices.find(device => 
+						device.vendorId === parseInt(USB_DEVICES.FT232R.vid, 16) && 
+						device.productId === parseInt(USB_DEVICES.FT232R.pid, 16)
+					);
+					
+					if (ft232rFound) {
+						log('✅ FT232R device found, connecting...', 'success');
+						await connectFT232R();
+						return;
+					}
+				} catch(e) {
+					console.error('WebUSB check error:', e);
+				}
+			}
+			
+			// If no FT232R, try CH340 via Android Bridge
+			if (window.Android) {
+				log('🔍 Trying CH340 via Android Bridge...', 'info');
+				connectCH340();
+				
+				// Set timeout for CH340 connection
+				setTimeout(() => {
+					if (!isUsbConnected && currentDeviceType === 'ch340') {
+						log('⚠️ CH340 connection timeout', 'warning');
+						updateUsbStatus('disconnected');
+						currentDeviceType = null;
+					}
+				}, 5000);
+			} else {
+				log('❌ No USB connection method available', 'error');
+				showToast('No USB support available in this browser', 'error');
+				updateUsbStatus('disconnected');
+			}
+		}
+		
+		function disconnectUsb() {
+			if (isServerRunning) {
+				stopServer();
+			}
+			
+			stopUsbHealthCheck();
+			
+			if (currentDeviceType === 'ch340') {
+				disconnectCH340();
+			} else if (currentDeviceType === 'ft232r') {
+				disconnectFT232R();
+			}
+			
+			isUsbConnected = false;
+			isReconnecting = false;
+			reconnectAttempts = 0;
+			isConnectingFT232R = false;
+			currentDeviceType = null;
+			updateUsbStatus('disconnected');
+			updateServerButton();
+			log('🔌 USB Disconnected', 'warning');
+		}
+		
+		function toggleUsb() {
+			if (isReconnecting) {
+				log('⏳ Reconnection in progress...', 'warning');
+				return;
+			}
+			
+			if (isUsbConnected) {
+				disconnectUsb();
+			} else {
+				connectUsb();
+			}
+		}
+		
+		// ============================================
+		// USB STATUS UI UPDATES (UPDATED)
+		// ============================================
+		function updateUsbStatus(status) {
+			const card = elements.usbStatusCard;
+			const dot = elements.usbDot;
+			const text = elements.usbStatusText;
+			const sub = elements.usbStatusSub;
+			const signal = elements.usbSignal;
+			const btn = elements.btnUsb;
+		
+			card.classList.remove('connected', 'reconnecting');
+			dot.classList.remove('connected', 'reconnecting');
+			btn.classList.remove('connected', 'reconnecting');
+		
+			const deviceName = currentDeviceType === 'ch340' ? 'CH340' : (currentDeviceType === 'ft232r' ? 'FT232R' : 'USB');
+		
+			switch(status) {
+				case 'connected':
+					card.classList.add('connected');
+					dot.classList.add('connected');
+					btn.classList.add('connected');
+					if (currentDeviceType === 'ft232r') {
+						text.textContent = `✅ FT232R Connected`;
+						sub.textContent = `FTDI FT232R • 9600 baud • WebUSB`;
+					} else if (currentDeviceType === 'ch340') {
+						text.textContent = `✅ CH340 Connected`;
+						sub.textContent = `CH340 Serial • 9600 baud • Android Bridge`;
+					} else {
+						text.textContent = `✅ USB Connected`;
+						sub.textContent = `Ready for meter reading`;
+					}
+					signal.textContent = '● Active';
+					signal.style.color = '#00e676';
+					btn.textContent = '🔌 DISCONNECT USB';
+					break;
+					
+				case 'reconnecting':
+					card.classList.add('reconnecting');
+					dot.classList.add('reconnecting');
+					btn.classList.add('reconnecting');
+					text.textContent = `🔄 Reconnecting ${deviceName}...`;
+					sub.textContent = `Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`;
+					signal.textContent = '● Weak';
+					signal.style.color = '#ff9800';
+					btn.textContent = '⏳ RECONNECTING...';
+					break;
+					
+				case 'connecting':
+					text.textContent = '🔌 Connecting USB...';
+					sub.textContent = 'Detecting device type...';
+					signal.textContent = '';
+					btn.textContent = '⏳ CONNECTING...';
+					break;
+					
+				case 'disconnected':
+				default:
+					text.textContent = '❌ No USB Device Connected';
+					sub.textContent = 'Connect CH340 or FT232R meter';
+					signal.textContent = '';
+					btn.textContent = '🔌 CONNECT USB';
+					break;
+			}
+		}
+		
+		// ============================================
+		// DATA PROCESSING (Keep existing implementation)
+		// ============================================
+		function arrayBufferToHex(buffer) {
+			const bytes = new Uint8Array(buffer);
+			let hex = '';
+			for (let i = 0; i < bytes.length; i++) {
+				hex += bytes[i].toString(16).padStart(2, '0').toUpperCase();
+			}
+			return hex;
+		}
+		
+		function processReceivedData(hexData, textData) {
+			if (!isServerRunning) {
+				// Still log data for debugging even if server not running
+				if (hexData && hexData.length > 0) {
+					console.log(`Data received but server not running: ${hexData.substring(0, 32)}...`);
+				}
+				return;
+			}
+			
+			lastDataTime = Date.now();
+		
+			// Detect request type and show simple status
+			if (hexData.includes("935A64")) {
+				log('🔄 Connection request received...', 'info');
+			} else if (hexData.includes("A041034110") || hexData.includes("A044034110")) {
+				log('🔄 Authentication in progress...', 'info');
+			} else if (hexData.includes("0100010800")) {
+				log('📊 Reading meter clock...', 'info');
+			} else if (hexData.includes("0100600100")) {
+				log('📊 Reading meter serial...', 'info');
+			} else if (hexData.includes("0201020204")) {
+				log('📊 Reading billing data...', 'info');
+				
+				if (!creditDeductedThisSession) {
+					const success = deductCredit();
+					if (success !== false) {
+						creditDeductedThisSession = true;
+					}
+				}
+			} else if (hexData.includes("0100010700") || hexData.includes("0100030700")) {
+				log('📊 Reading instant values...', 'info');
+			} else if (hexData.includes("5356A2")) {
+				log('✅ Reading Complete!', 'success');
+				
+				try { if (window.Android) Android.vibrate(100); } catch(e) {}
+			}
+		
+			// Process and send response
+			const reply = CurrentLogic.processPacket(hexData);
+			if (reply) {
+				setTimeout(() => {
+					if (currentDeviceType === 'ch340') {
+						sendCH340Data(reply);
+					} else if (currentDeviceType === 'ft232r' && ft232rDevice && ft232rDevice.opened) {
+						sendFT232RData(ft232rDevice, reply);
+					}
+				}, 50);
+			}
+		}
+		
+		// ============================================
+		// MANUAL DEVICE SELECTION (Optional)
+		// ============================================
+		async function connectSpecificDevice(deviceType) {
+			if (isUsbConnected) {
+				disconnectUsb();
+			}
+			
+			if (deviceType === 'ft232r') {
+				await connectFT232R();
+			} else if (deviceType === 'ch340') {
+				connectCH340();
+			}
+		}
+		
+		// ============================================
+		// AUTO DETECTION ON PAGE LOAD
+		// ============================================
+		async function autoDetectAndConnect() {
+			log('🔍 Auto-detecting USB devices...', 'info');
+			
+			// Check for FT232R via WebUSB
+			if (navigator.usb) {
+				try {
+					const devices = await navigator.usb.getDevices();
+					const ft232rFound = devices.find(device => 
+						device.vendorId === parseInt(USB_DEVICES.FT232R.vid, 16) && 
+						device.productId === parseInt(USB_DEVICES.FT232R.pid, 16)
+					);
+					
+					if (ft232rFound) {
+						log('✅ FT232R already paired, connecting...', 'success');
+						await connectFT232R();
+						return true;
+					}
+				} catch(e) {
+					console.error('Auto-detect error:', e);
+				}
+			}
+			
+			// Check for CH340 via Android Bridge
+			if (window.Android && typeof Android.isDeviceConnected === 'function') {
+				try {
+					const isConnected = Android.isDeviceConnected();
+					if (isConnected) {
+						log('✅ CH340 detected, connecting...', 'success');
+						connectCH340();
+						return true;
+					}
+				} catch(e) {}
+			}
+			
+			log('ℹ️ No USB device detected. Please connect manually.', 'info');
+			return false;
+		}
     </script>
 </body>
 </html>
