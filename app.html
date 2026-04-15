@@ -1,13 +1,15 @@
-<!DOCTYPE html>
+=-9[0 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>WEBPERA · USB Meter Reader</title>
+    <title>WEBPERA · Dashboard</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..700;1,14..32,400..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
     <style>
+        /* ----- WHITE MODERN THEME ----- */
         * {
             margin: 0;
             padding: 0;
@@ -16,8 +18,10 @@
 
         body {
             background: #f8fafc;
-            font-family: 'Inter', sans-serif;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             color: #1e293b;
+            padding: 0;
+            margin: 0;
             line-height: 1.5;
         }
 
@@ -27,6 +31,7 @@
             padding: 20px 16px 32px;
         }
 
+        /* ----- APP HEADER (elevated) ----- */
         .app-header {
             display: flex;
             justify-content: space-between;
@@ -34,22 +39,29 @@
             padding: 16px 20px;
             background: white;
             border-radius: 28px;
-            box-shadow: 0 8px 20px -6px rgba(0,0,0,0.05);
+            box-shadow: 0 8px 20px -6px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0,0,0,0.02);
             margin-bottom: 24px;
+            border: 1px solid rgba(0,0,0,0.02);
         }
 
-        .logo {
+        .app-header .logo {
             font-weight: 700;
             font-size: 1.5rem;
+            letter-spacing: -0.5px;
             background: linear-gradient(135deg, #2563eb, #0f2b5e);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
         .user-info {
             display: flex;
             align-items: center;
             gap: 16px;
+        }
+
+        .credits-box {
+            text-align: right;
         }
 
         .credits-box .total {
@@ -59,11 +71,21 @@
             font-size: 0.8rem;
             font-weight: 600;
             color: #2563eb;
+            border: 1px solid #dbeafe;
+            display: inline-block;
+            box-shadow: 0 2px 4px rgba(37,99,235,0.1);
+        }
+
+        .credits-box .total.low {
+            background: #fff7ed;
+            color: #c2410c;
+            border-color: #fed7aa;
         }
 
         .credits-box .total.critical {
             background: #fef2f2;
             color: #b91c1c;
+            border-color: #fecaca;
         }
 
         .credits-box .daily {
@@ -75,18 +97,31 @@
         .logout-btn {
             background: white;
             border: 1px solid #e2e8f0;
+            color: #475569;
             padding: 8px 18px;
             border-radius: 40px;
-            cursor: pointer;
             font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.02);
         }
 
+        .logout-btn:hover {
+            background: #f1f5f9;
+            border-color: #cbd5e1;
+            color: #0f172a;
+        }
+
+        /* ----- USB STATUS CARD (modern) ----- */
         .usb-status-card {
             background: white;
             border-radius: 24px;
             padding: 20px;
             margin-bottom: 20px;
             box-shadow: 0 10px 25px -10px rgba(0,0,0,0.1);
+            border: 1px solid rgba(0,0,0,0.02);
+            transition: all 0.2s;
         }
 
         .usb-status-card.connected {
@@ -118,9 +153,21 @@
             box-shadow: 0 0 0 3px #dcfce7;
         }
 
+        .usb-dot.reconnecting {
+            background: #f97316;
+            box-shadow: 0 0 0 3px #ffedd5;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 3px #ffedd5; }
+            50% { box-shadow: 0 0 0 6px #ffedd5; opacity: 0.7; }
+        }
+
         .usb-status-text {
             font-weight: 600;
             font-size: 1rem;
+            color: #1e293b;
         }
 
         .usb-status-sub {
@@ -134,23 +181,33 @@
             padding: 6px 12px;
             border-radius: 40px;
             font-size: 0.7rem;
+            color: #334155;
+            font-weight: 500;
         }
 
+        /* ----- CARD (white, soft) ----- */
         .card {
             background: white;
             border-radius: 24px;
             padding: 24px;
             margin-bottom: 24px;
             box-shadow: 0 8px 25px -12px rgba(0,0,0,0.1);
+            border: 1px solid rgba(0,0,0,0.02);
         }
 
         .card h3 {
             font-weight: 600;
+            font-size: 1.1rem;
             margin-bottom: 20px;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+            gap: 6px;
             border-bottom: 1px solid #f1f5f9;
             padding-bottom: 12px;
         }
 
+        /* form elements */
         .form-group {
             margin-bottom: 20px;
         }
@@ -161,6 +218,8 @@
             font-weight: 500;
             color: #475569;
             margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
         }
 
         .form-group input,
@@ -172,6 +231,16 @@
             border-radius: 20px;
             font-family: 'Inter', sans-serif;
             font-size: 0.95rem;
+            color: #0f172a;
+            transition: all 0.15s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            border-color: #2563eb;
+            outline: none;
+            box-shadow: 0 0 0 4px #dbeafe;
+            background: white;
         }
 
         .row {
@@ -183,56 +252,95 @@
             flex: 1;
         }
 
+        /* ----- BUTTON ROW (elegant) ----- */
         .button-row {
             display: flex;
             gap: 16px;
             margin-bottom: 24px;
         }
 
-        .btn-usb {
+        .button-row button {
             flex: 1;
-            padding: 18px;
+            padding: 18px 10px;
             border-radius: 30px;
             font-weight: 600;
+            font-size: 0.95rem;
             border: none;
             cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'Inter', sans-serif;
+            box-shadow: 0 6px 14px rgba(0,0,0,0.02);
+        }
+
+        .btn-usb {
             background: #2563eb;
             color: white;
-            font-size: 1rem;
+            box-shadow: 0 12px 20px -14px #2563eb;
+        }
+
+        .btn-usb:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
         }
 
         .btn-usb.connected {
             background: #22c55e;
+            box-shadow: 0 12px 20px -14px #22c55e;
+        }
+
+        .btn-usb.reconnecting {
+            background: #f97316;
+            box-shadow: 0 12px 20px -14px #f97316;
+            animation: softBlink 1.2s infinite;
+        }
+
+        @keyframes softBlink {
+            0% { opacity: 1; }
+            50% { opacity: 0.8; background: #fb923c; }
         }
 
         .btn-server {
-            flex: 1;
-            padding: 18px;
-            border-radius: 30px;
-            font-weight: 600;
-            border: none;
-            cursor: pointer;
             background: #e2e8f0;
             color: #64748b;
-            font-size: 1rem;
+            cursor: default;
         }
 
         .btn-server.ready {
             background: #2563eb;
             color: white;
+            box-shadow: 0 12px 20px -14px #2563eb;
+            cursor: pointer;
+        }
+
+        .btn-server.ready:hover {
+            background: #1d4ed8;
+            transform: translateY(-2px);
         }
 
         .btn-server.running {
             background: #ef4444;
             color: white;
+            box-shadow: 0 12px 20px -14px #ef4444;
+            cursor: pointer;
         }
 
+        .btn-server.running:hover {
+            background: #dc2626;
+        }
+
+        /* ----- SERVER STATUS (minimal) ----- */
         .server-status {
             background: #f8fafc;
             border-radius: 40px;
-            padding: 16px;
+            padding: 16px 24px;
             margin-bottom: 24px;
             text-align: center;
+            border: 1px solid #e2e8f0;
+        }
+
+        .server-status .status-text {
+            font-weight: 500;
+            color: #475569;
         }
 
         .server-status.running .status-text {
@@ -240,6 +348,7 @@
             font-weight: 600;
         }
 
+        /* ----- LOG BOX (clean) ----- */
         .log-box {
             background: #f8fafc;
             border: 1px solid #e2e8f0;
@@ -247,14 +356,20 @@
             padding: 20px;
             height: 200px;
             overflow-y: auto;
-            font-family: monospace;
-            font-size: 0.75rem;
+            font-family: 'Menlo', 'Consolas', monospace;
+            font-size: 0.8rem;
+            color: #1e293b;
             margin-top: 12px;
         }
 
         .log-entry {
             padding: 6px 0;
             border-bottom: 1px solid #e2e8f0;
+            color: #334155;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
         }
 
         .log-entry.success { color: #16a34a; }
@@ -268,44 +383,94 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
+            margin-bottom: 6px;
         }
 
         .btn-small {
             background: #f1f5f9;
             border: 1px solid #e2e8f0;
-            padding: 6px 16px;
+            padding: 8px 18px;
             border-radius: 40px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: #334155;
             cursor: pointer;
-            font-size: 0.7rem;
+            transition: all 0.15s;
         }
 
-        .toast {
+        .btn-small:hover {
+            background: #e2e8f0;
+        }
+
+        /* toast notification */
+        .credit-toast {
             position: fixed;
             bottom: 24px;
             left: 50%;
             transform: translateX(-50%);
             background: white;
-            padding: 12px 24px;
+            color: #0f172a;
+            padding: 14px 30px;
             border-radius: 60px;
+            font-weight: 500;
+            font-size: 0.9rem;
             box-shadow: 0 20px 35px -10px rgba(0,0,0,0.2);
+            border: 1px solid #e2e8f0;
             z-index: 1000;
             opacity: 0;
             transition: opacity 0.2s;
             pointer-events: none;
-            font-weight: 500;
         }
 
-        .toast.show {
+        .credit-toast.show {
             opacity: 1;
         }
 
-        .toast.error { background: #ef4444; color: white; }
+        .credit-toast.error { background: #ef4444; color: white; border: none; }
+        .credit-toast.warning { background: #f97316; color: white; border: none; }
+
+        /* blackout overlay */
+        .blackout {
+            position: fixed;
+            inset: 0;
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(8px);
+            z-index: 9999;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .blackout.active {
+            display: flex;
+        }
+
+        .blackout-msg {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #0f172a;
+            margin-bottom: 8px;
+        }
+
+        .blackout-sub {
+            color: #475569;
+            font-size: 0.9rem;
+        }
     </style>
 </head>
 <body>
-    <div class="toast" id="toast">💳 Credit Used</div>
+    <!-- Blackout -->
+    <div class="blackout" id="blackout">
+        <div class="blackout-msg">📡 No Internet Connection</div>
+        <div class="blackout-sub">Please connect to continue</div>
+    </div>
+
+    <!-- Toast -->
+    <div class="credit-toast" id="creditToast">💳 Credit Used</div>
 
     <div class="container">
+        <!-- App Header -->
         <div class="app-header">
             <div class="logo">WEBPERA</div>
             <div class="user-info">
@@ -313,17 +478,18 @@
                     <div class="total" id="creditsDisplay">Credits: --</div>
                     <div class="daily" id="dailyDisplay">Today: --/--</div>
                 </div>
-                <button class="logout-btn" id="logoutBtn">Logout</button>
+                <button class="logout-btn" onclick="logout()">Logout</button>
             </div>
         </div>
 
+        <!-- USB Status Card -->
         <div class="usb-status-card" id="usbStatusCard">
             <div class="usb-status-row">
                 <div class="usb-status-left">
                     <div class="usb-dot" id="usbDot"></div>
                     <div>
-                        <div class="usb-status-text" id="usbStatusText">No Device Connected</div>
-                        <div class="usb-status-sub" id="usbStatusSub">Click CONNECT USB to start</div>
+                        <div class="usb-status-text" id="usbStatusText">USB Not Connected</div>
+                        <div class="usb-status-sub" id="usbStatusSub">Connect USB cable</div>
                     </div>
                 </div>
                 <div class="usb-status-right">
@@ -332,7 +498,8 @@
             </div>
         </div>
 
-        <div class="card">
+        <!-- Meter Config Card -->
+        <div class="card" id="configPanel">
             <h3>⚙️ Meter Configuration</h3>
             
             <div class="form-group">
@@ -348,7 +515,7 @@
 
             <div class="form-group">
                 <label>Serial No (Name Plate)</label>
-                <input type="text" id="val_serial" placeholder="e.g. 9023456" value="3472454">
+                <input type="text" id="val_serial" value="" placeholder="e.g. 9023456">
             </div>
 
             <div class="row">
@@ -374,32 +541,42 @@
             </div>
         </div>
 
+        <!-- Two Action Buttons -->
         <div class="button-row">
-            <button id="btnUsb" class="btn-usb">🔌 CONNECT USB</button>
-            <button id="btnServer" class="btn-server">▶️ START SERVER</button>
+            <button id="btnUsb" class="btn-usb" onclick="toggleUsb()">🔌 CONNECT USB</button>
+            <button id="btnServer" class="btn-server" onclick="toggleServer()">▶️ START SERVER</button>
         </div>
 
+        <!-- Server Status -->
         <div class="server-status" id="serverStatus">
             <div class="status-text" id="serverStatusText">Server Stopped</div>
         </div>
 
+        <!-- Log Box -->
         <div class="card">
             <div class="log-header">
                 <h3>📄 Status Log</h3>
-                <button class="btn-small" id="clearLogsBtn">Clear</button>
+                <button class="btn-small" onclick="clearLogs()">Clear</button>
             </div>
             <div id="logBox" class="log-box">
-                <div class="log-entry info"><span class="time">[--:--]</span> System Ready. Click CONNECT USB.</div>
+                <div class="log-entry info"><span class="time">[--:--]</span> System Ready. Connect USB.</div>
             </div>
         </div>
     </div>
-	<!-- Firebase Config -->
+
+    <!-- Firebase & scripts (keep as is) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+   <!-- Firebase Config -->
     <script src="js/firebase-config.js"></script>
+	
 
     <!-- Net Guard -->
     <script src="js/net-guard.js"></script>
 
-    <!-- Meter Logic Files -->
+    <!-- Utils and Logic -->
+    <script src="js/utils.js"></script>
     <script src="meters/avon.js"></script>
     <script src="meters/avon2.js"></script>
     <script src="meters/mt_profile.js"></script>
@@ -413,461 +590,8 @@
 
     <!-- Auth Handler -->
     <script src="js/auth.js"></script>
-    <script>
-        // ============================================
-        // JS CODE - WORKS WITH YOUR EXISTING ANDROID CODE
-        // NO CHANGES NEEDED IN ANDROID
-        // ============================================
+	<script src="js/CH340.js"></script>
+	<script src="js/FT232R.js"></script>
 
-        // DOM Elements
-        const elements = {
-            creditsDisplay: document.getElementById('creditsDisplay'),
-            dailyDisplay: document.getElementById('dailyDisplay'),
-            usbStatusCard: document.getElementById('usbStatusCard'),
-            usbDot: document.getElementById('usbDot'),
-            usbStatusText: document.getElementById('usbStatusText'),
-            usbStatusSub: document.getElementById('usbStatusSub'),
-            usbSignal: document.getElementById('usbSignal'),
-            btnUsb: document.getElementById('btnUsb'),
-            btnServer: document.getElementById('btnServer'),
-            serverStatus: document.getElementById('serverStatus'),
-            serverStatusText: document.getElementById('serverStatusText'),
-            logBox: document.getElementById('logBox'),
-            toast: document.getElementById('toast'),
-            meterSelect: document.getElementById('meterSelect'),
-            valSerial: document.getElementById('val_serial'),
-            valKwh: document.getElementById('val_kwh'),
-            valKvah: document.getElementById('val_kvah'),
-            valMdKw: document.getElementById('val_md_kw'),
-            valMdKva: document.getElementById('val_md_kva'),
-            logoutBtn: document.getElementById('logoutBtn'),
-            clearLogsBtn: document.getElementById('clearLogsBtn')
-        };
-
-        // App State
-        let isUsbConnected = false;
-        let isServerRunning = false;
-        let isConnecting = false;
-        let lastDataTime = 0;
-        let healthInterval = null;
-        let connectionStartTime = 0;
-
-        // User Credits (Mock - Replace with Firebase)
-        let userCredits = 100;
-        let dailyUsed = 0;
-        let dailyLimit = 40;
-
-        // ============================================
-        // UTILITY FUNCTIONS
-        // ============================================
-        function log(msg, type = 'info') {
-            const box = elements.logBox;
-            const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            const entry = document.createElement('div');
-            entry.className = `log-entry ${type}`;
-            entry.innerHTML = `<span class="time">[${time}]</span> ${msg}`;
-            box.appendChild(entry);
-            box.scrollTop = box.scrollHeight;
-            while (box.children.length > 100) box.removeChild(box.firstChild);
-        }
-
-        function showToast(message, type = 'success') {
-            const toast = elements.toast;
-            toast.textContent = message;
-            toast.classList.remove('error');
-            if (type === 'error') toast.classList.add('error');
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
-        }
-
-        function updateCreditsDisplay() {
-            elements.creditsDisplay.textContent = `Credits: ${userCredits}`;
-            if (userCredits <= 10) elements.creditsDisplay.classList.add('critical');
-            elements.dailyDisplay.textContent = `Today: ${dailyUsed}/${dailyLimit}`;
-        }
-
-        function canUseCredit() {
-            if (userCredits <= 0) return { allowed: false, reason: "Subscription Expired" };
-            if (dailyUsed >= dailyLimit) return { allowed: false, reason: "Daily limit reached!" };
-            return { allowed: true, reason: "" };
-        }
-
-        function deductCredit() {
-            const check = canUseCredit();
-            if (!check.allowed) {
-                showToast(check.reason, 'error');
-                log(`❌ ${check.reason}`, 'error');
-                if (check.reason === "Subscription Expired") {
-                    setTimeout(() => logout(), 2000);
-                }
-                return false;
-            }
-
-            userCredits--;
-            dailyUsed++;
-            updateCreditsDisplay();
-            showToast(`💳 Credit Used | Remaining: ${userCredits}`);
-            log(`💳 Credit deducted! Remaining: ${userCredits} | Today: ${dailyUsed}/${dailyLimit}`, 'credit');
-            return true;
-        }
-
-        // ============================================
-        // USB STATUS UI
-        // ============================================
-        function updateUsbStatus(status) {
-            const card = elements.usbStatusCard;
-            const dot = elements.usbDot;
-            const btn = elements.btnUsb;
-            const text = elements.usbStatusText;
-            const sub = elements.usbStatusSub;
-            const signal = elements.usbSignal;
-
-            card.classList.remove('connected');
-            dot.classList.remove('connected');
-            btn.classList.remove('connected');
-
-            if (status === 'connected') {
-                card.classList.add('connected');
-                dot.classList.add('connected');
-                btn.classList.add('connected');
-                btn.textContent = '🔌 DISCONNECT USB';
-                text.textContent = '✅ USB Connected';
-                sub.textContent = 'Ready for meter reading';
-                signal.textContent = '● Active';
-                signal.style.color = '#00e676';
-                
-            } else if (status === 'connecting') {
-                btn.textContent = '⏳ CONNECTING...';
-                text.textContent = '🔌 Connecting...';
-                sub.textContent = 'Please wait';
-                signal.textContent = '';
-            } else {
-                btn.textContent = '🔌 CONNECT USB';
-                text.textContent = '❌ No Device Connected';
-                sub.textContent = 'Click CONNECT USB to start';
-                signal.textContent = '';
-            }
-        }
-
-        function updateServerButton() {
-            const btn = elements.btnServer;
-            btn.classList.remove('ready', 'running');
-
-            if (!isUsbConnected) {
-                btn.textContent = '▶️ START SERVER';
-                btn.disabled = true;
-                btn.style.opacity = '0.5';
-                btn.style.cursor = 'not-allowed';
-            } else if (isServerRunning) {
-                btn.textContent = '⏹️ STOP SERVER';
-                btn.classList.add('running');
-                btn.disabled = false;
-                btn.style.opacity = '1';
-            } else {
-                btn.textContent = '▶️ START SERVER';
-                btn.classList.add('ready');
-                btn.disabled = false;
-                btn.style.opacity = '1';
-            }
-        }
-
-        function updateServerStatus() {
-            if (isServerRunning) {
-                elements.serverStatus.classList.add('running');
-                elements.serverStatusText.textContent = '🟢 Server Running - Ready for Reading';
-            } else {
-                elements.serverStatus.classList.remove('running');
-                elements.serverStatusText.textContent = 'Server Stopped';
-            }
-        }
-
-        // ============================================
-        // METER DATA PROCESSING
-        // ============================================
-        function processMeterData(hexData) {
-            if (!hexData || hexData.length === 0) return null;
-            
-            lastDataTime = Date.now();
-            
-            // Log different types of requests
-            if (hexData.includes("935A64")) {
-                log('🔄 Connection request received', 'info');
-            } else if (hexData.includes("A041034110") || hexData.includes("A044034110")) {
-                log('🔐 Authentication in progress', 'info');
-            } else if (hexData.includes("0100010800")) {
-                log('⏰ Reading meter clock...', 'info');
-            } else if (hexData.includes("0100600100")) {
-                log('🔢 Reading serial number...', 'info');
-            } else if (hexData.includes("0201020204")) {
-                log('📊 Reading billing data...', 'info');
-                deductCredit();
-            } else if (hexData.includes("0100010700") || hexData.includes("0100030700")) {
-                log('⚡ Reading instant values...', 'info');
-            } else if (hexData.includes("5356A2")) {
-                log('✅ Reading complete!', 'success');
-            }
-            
-            // Build response based on request type
-            const serial = elements.valSerial.value || "3472454";
-            const kwh = (parseFloat(elements.valKwh.value) || 1234.5).toFixed(1);
-            const kvah = (parseFloat(elements.valKvah.value) || 1300.0).toFixed(1);
-            const mdKw = (parseFloat(elements.valMdKw.value) || 1.2).toFixed(1);
-            const mdKva = (parseFloat(elements.valMdKva.value) || 1.8).toFixed(1);
-            
-            const now = new Date();
-            const dateTime = now.getFullYear().toString() +
-                (now.getMonth() + 1).toString().padStart(2, '0') +
-                now.getDate().toString().padStart(2, '0') +
-                now.getHours().toString().padStart(2, '0') +
-                now.getMinutes().toString().padStart(2, '0') +
-                now.getSeconds().toString().padStart(2, '0');
-            
-            let response = null;
-            
-            if (hexData.includes("0100010800")) {
-                response = "A0" + hexData.substring(2, 6) + dateTime + "FF";
-            } else if (hexData.includes("0100600100")) {
-                response = "A0" + hexData.substring(2, 6) + serial.padStart(14, '0') + "FF";
-            } else if (hexData.includes("0201020204")) {
-                const kwhVal = Math.floor(parseFloat(kwh) * 10).toString().padStart(8, '0');
-                const kvahVal = Math.floor(parseFloat(kvah) * 10).toString().padStart(8, '0');
-                response = "A0" + hexData.substring(2, 6) + "0000" + kwhVal + kvahVal + "FF";
-            } else if (hexData.includes("0100010700")) {
-                const kwVal = Math.floor(parseFloat(mdKw) * 100).toString().padStart(6, '0');
-                const kvaVal = Math.floor(parseFloat(mdKva) * 100).toString().padStart(6, '0');
-                response = "A0" + hexData.substring(2, 6) + kwVal + kvaVal + "000000FF";
-            } else if (hexData.length >= 10) {
-                response = "A0" + hexData.substring(2, 6) + "00FF";
-            }
-            
-            return response;
-        }
-
-        // ============================================
-        // CONNECTION HANDLERS
-        // ============================================
-        function connectUsb() {
-            if (isUsbConnected) {
-                disconnectUsb();
-                return;
-            }
-            
-            if (isConnecting) {
-                log('⏳ Connection already in progress...', 'warning');
-                return;
-            }
-            
-            isConnecting = true;
-            connectionStartTime = Date.now();
-            updateUsbStatus('connecting');
-            log('🔌 Connecting to USB device...', 'info');
-            
-            try {
-                if (window.Android && window.Android.connectUSB) {
-                    window.Android.connectUSB();
-                } else {
-                    log('❌ Android bridge not available!', 'error');
-                    showToast('Android bridge not available', 'error');
-                    updateUsbStatus('disconnected');
-                    isConnecting = false;
-                }
-            } catch(e) {
-                log(`❌ Connection error: ${e.message}`, 'error');
-                updateUsbStatus('disconnected');
-                isConnecting = false;
-            }
-            
-            // Timeout after 10 seconds
-            setTimeout(() => {
-                if (isConnecting && !isUsbConnected) {
-                    log('⚠️ Connection timeout. Make sure USB device is connected.', 'warning');
-                    updateUsbStatus('disconnected');
-                    isConnecting = false;
-                }
-            }, 10000);
-        }
-
-        function disconnectUsb() {
-            if (isServerRunning) {
-                stopServer();
-            }
-            
-            if (healthInterval) {
-                clearInterval(healthInterval);
-                healthInterval = null;
-            }
-            
-            try {
-                if (window.Android && window.Android.disconnect) {
-                    window.Android.disconnect();
-                }
-            } catch(e) {}
-            
-            isUsbConnected = false;
-            isConnecting = false;
-            updateUsbStatus('disconnected');
-            updateServerButton();
-            log('🔌 USB Disconnected', 'warning');
-        }
-
-        // ============================================
-        // SERVER FUNCTIONS
-        // ============================================
-        function startServer() {
-            if (!isUsbConnected) {
-                log('⚠️ Please connect USB first!', 'warning');
-                showToast('Connect USB first!', 'error');
-                return;
-            }
-            
-            if (userCredits <= 0) {
-                log('❌ No credits remaining!', 'error');
-                showToast('Please recharge credits', 'error');
-                return;
-            }
-            
-            isServerRunning = true;
-            updateServerButton();
-            updateServerStatus();
-            log('▶️ Server Started - Ready for meter reading', 'success');
-            showToast('Server Started!');
-            
-            // Start health check
-            lastDataTime = Date.now();
-            healthInterval = setInterval(() => {
-                if (isServerRunning && isUsbConnected) {
-                    const timeSince = Date.now() - lastDataTime;
-                    const signal = elements.usbSignal;
-                    if (timeSince < 5000) {
-                        signal.textContent = '● Active';
-                        signal.style.color = '#00e676';
-                    } else if (timeSince < 15000) {
-                        signal.textContent = '● Idle';
-                        signal.style.color = '#888';
-                    } else {
-                        signal.textContent = '● Waiting';
-                        signal.style.color = '#ff9800';
-                    }
-                }
-            }, 2000);
-        }
-
-        function stopServer() {
-            isServerRunning = false;
-            if (healthInterval) {
-                clearInterval(healthInterval);
-                healthInterval = null;
-            }
-            updateServerButton();
-            updateServerStatus();
-            log('⏹️ Server Stopped', 'warning');
-        }
-
-        function logout() {
-            disconnectUsb();
-            stopServer();
-            log('👋 Logging out...', 'info');
-            setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 500);
-        }
-
-        // ============================================
-        // ANDROID BRIDGE CALLBACKS
-        // YOUR EXISTING ANDROID CODE CALLS THESE
-        // ============================================
-        
-        window.onConnected = function() {
-            const connectionTime = (Date.now() - connectionStartTime) / 1000;
-            log(`✅ USB Connected Successfully! (${connectionTime.toFixed(1)} sec)`, 'success');
-            isUsbConnected = true;
-            isConnecting = false;
-            updateUsbStatus('connected');
-            updateServerButton();
-            showToast('USB Connected!');
-        };
-        
-        window.onUsbAttached = function() {
-            log('🔌 USB device attached', 'info');
-            if (!isUsbConnected && !isConnecting) {
-                setTimeout(() => connectUsb(), 500);
-            }
-        };
-        
-        window.onUsbDetached = function() {
-            log('⚠️ USB device detached!', 'error');
-            showToast('USB Disconnected!', 'error');
-            disconnectUsb();
-        };
-        
-        window.onUsbError = function(error) {
-            log(`❌ USB Error: ${error}`, 'error');
-            isConnecting = false;
-            updateUsbStatus('disconnected');
-            showToast(`USB Error: ${error}`, 'error');
-        };
-        
-        window.onDataReceived = function(hexData) {
-            if (!isServerRunning) return;
-            
-            const reply = processMeterData(hexData);
-            if (reply && window.Android && window.Android.sendData) {
-                try {
-                    window.Android.sendData(reply);
-                } catch(e) {
-                    log(`❌ Send error: ${e.message}`, 'error');
-                }
-            }
-        };
-        
-        window.onLog = function(message) {
-            if (message && !message.includes('RX:') && !message.includes('TX:') && !message.includes('hex')) {
-                if (message.includes('Permission')) {
-                    log(message, 'warning');
-                } else {
-                    log(message, 'info');
-                }
-            }
-        };
-
-        // ============================================
-        // EVENT LISTENERS
-        // ============================================
-        elements.btnUsb.addEventListener('click', connectUsb);
-        
-        elements.btnServer.addEventListener('click', () => {
-            if (isServerRunning) {
-                stopServer();
-            } else {
-                startServer();
-            }
-        });
-        
-        elements.logoutBtn.addEventListener('click', logout);
-        
-        elements.clearLogsBtn.addEventListener('click', () => {
-            elements.logBox.innerHTML = '';
-            log('📜 Logs cleared', 'info');
-        });
-
-        // ============================================
-        // INITIALIZATION
-        // ============================================
-        function init() {
-            updateCreditsDisplay();
-            updateUsbStatus('disconnected');
-            updateServerStatus();
-            log('🚀 WEBPERA Ready!', 'success');
-            log('📱 Click CONNECT USB to start meter reading', 'info');
-            
-            if (typeof window.Android !== 'undefined') {
-                log('✅ Android Bridge detected', 'success');
-            } else {
-                log('⚠️ Android Bridge not detected', 'warning');
-            }
-        }
-        
-        init();
-    </script>
 </body>
 </html>
