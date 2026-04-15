@@ -612,7 +612,10 @@
 		var CurrentLogic = Logic;
 		
 		// ========== FIREBASE INIT ==========
-		firebase.initializeApp(firebaseConfig);
+		// Firebase already initialized in auth.js, so check if already initialized
+		if (!firebase.apps.length) {
+			firebase.initializeApp(firebaseConfig);
+		}
 		const auth = firebase.auth();
 		const db = firebase.firestore();
 		
@@ -743,6 +746,7 @@
 		
 		function showToast(message, type = 'success') {
 			const toast = document.getElementById('creditToast');
+			if (!toast) return;
 			toast.textContent = message;
 			toast.classList.remove('error', 'warning');
 			if (type === 'error') toast.classList.add('error');
@@ -763,6 +767,8 @@
 		
 		// ========== USB FUNCTIONS ==========
 		function toggleUsb() {
+			log('🖱️ USB Toggle clicked', 'info');
+			
 			if (isReconnecting) {
 				log('⏳ Reconnection in progress...', 'warning');
 				return;
@@ -780,9 +786,16 @@
 			updateUsbStatus('connecting');
 			
 			try {
-				Android.connectUSB();
+				if (typeof Android !== 'undefined' && Android.connectUSB) {
+					Android.connectUSB();
+					log('📱 Android.connectUSB() called', 'info');
+				} else {
+					log('❌ Android bridge not available', 'error');
+					updateUsbStatus('disconnected');
+					showToast('Android bridge not available', 'error');
+				}
 			} catch(e) {
-				log('❌ USB connection failed - Android bridge not found', 'error');
+				log('❌ USB connection failed: ' + e.message, 'error');
 				updateUsbStatus('disconnected');
 			}
 		}
@@ -795,7 +808,9 @@
 			stopUsbHealthCheck();
 			
 			try {
-				Android.disconnect();
+				if (typeof Android !== 'undefined' && Android.disconnect) {
+					Android.disconnect();
+				}
 			} catch(e) {}
 			
 			isUsbConnected = false;
@@ -814,73 +829,79 @@
 			const signal = document.getElementById('usbSignal');
 			const btn = document.getElementById('btnUsb');
 		
+			if (!card || !dot || !text || !sub || !btn) return;
+		
 			card.classList.remove('connected', 'reconnecting');
 			dot.classList.remove('connected', 'reconnecting');
-			btn.classList.remove('connected', 'reconnecting');
+			if (btn) btn.classList.remove('connected', 'reconnecting');
 		
 			switch(status) {
 				case 'connected':
-					card.classList.add('connected');
-					dot.classList.add('connected');
-					btn.classList.add('connected');
-					text.textContent = '✅ FT232R Connected';
-					sub.textContent = 'FTDI Serial • 9600 baud';
-					signal.textContent = '● Strong';
-					signal.style.color = '#00e676';
-					btn.textContent = '🔌 DISCONNECT USB';
+					if (card) card.classList.add('connected');
+					if (dot) dot.classList.add('connected');
+					if (btn) btn.classList.add('connected');
+					if (text) text.textContent = '✅ FT232R Connected';
+					if (sub) sub.textContent = 'FTDI Serial • 9600 baud';
+					if (signal) {
+						signal.textContent = '● Strong';
+						signal.style.color = '#00e676';
+					}
+					if (btn) btn.textContent = '🔌 DISCONNECT USB';
 					break;
 					
 				case 'reconnecting':
-					card.classList.add('reconnecting');
-					dot.classList.add('reconnecting');
-					btn.classList.add('reconnecting');
-					text.textContent = '🔄 Reconnecting...';
-					sub.textContent = `Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`;
-					signal.textContent = '● Weak';
-					signal.style.color = '#ff9800';
-					btn.textContent = '⏳ RECONNECTING...';
+					if (card) card.classList.add('reconnecting');
+					if (dot) dot.classList.add('reconnecting');
+					if (btn) btn.classList.add('reconnecting');
+					if (text) text.textContent = '🔄 Reconnecting...';
+					if (sub) sub.textContent = `Attempt ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS}`;
+					if (signal) {
+						signal.textContent = '● Weak';
+						signal.style.color = '#ff9800';
+					}
+					if (btn) btn.textContent = '⏳ RECONNECTING...';
 					break;
 					
 				case 'connecting':
-					text.textContent = '🔌 Connecting FT232R...';
-					sub.textContent = 'Please wait';
-					signal.textContent = '';
-					btn.textContent = '⏳ CONNECTING...';
+					if (text) text.textContent = '🔌 Connecting FT232R...';
+					if (sub) sub.textContent = 'Please wait';
+					if (signal) signal.textContent = '';
+					if (btn) btn.textContent = '⏳ CONNECTING...';
 					break;
 					
 				case 'disconnected':
 				default:
-					text.textContent = '❌ FT232R Not Connected';
-					sub.textContent = 'Connect FT232R USB cable to begin';
-					signal.textContent = '';
-					btn.textContent = '🔌 CONNECT FT232R';
+					if (text) text.textContent = '❌ FT232R Not Connected';
+					if (sub) sub.textContent = 'Connect FT232R USB cable to begin';
+					if (signal) signal.textContent = '';
+					if (btn) btn.textContent = '🔌 CONNECT FT232R';
 					break;
 			}
 		}
 		
 		// ========== USB HEALTH CHECK ==========
 		function startUsbHealthCheck() {
-			stopUsbHealthCheck(); // Clear any existing
+			stopUsbHealthCheck();
 			
 			lastDataTime = Date.now();
 			
 			usbHealthCheckInterval = setInterval(() => {
 				if (!isUsbConnected || !isServerRunning) return;
 				
-				// Check if we received data recently (within 30 sec during active session)
 				const timeSinceData = Date.now() - lastDataTime;
-				
-				// Update signal indicator
 				const signal = document.getElementById('usbSignal');
-				if (timeSinceData < 5000) {
-					signal.textContent = '● Active';
-					signal.style.color = '#00e676';
-				} else if (timeSinceData < 15000) {
-					signal.textContent = '● Idle';
-					signal.style.color = '#888';
-				} else {
-					signal.textContent = '● Waiting...';
-					signal.style.color = '#ff9800';
+				
+				if (signal) {
+					if (timeSinceData < 5000) {
+						signal.textContent = '● Active';
+						signal.style.color = '#00e676';
+					} else if (timeSinceData < 15000) {
+						signal.textContent = '● Idle';
+						signal.style.color = '#888';
+					} else {
+						signal.textContent = '● Waiting...';
+						signal.style.color = '#ff9800';
+					}
 				}
 			}, 2000);
 		}
@@ -911,9 +932,10 @@
 			
 			setTimeout(() => {
 				try {
-					Android.connectUSB();
+					if (typeof Android !== 'undefined' && Android.connectUSB) {
+						Android.connectUSB();
+					}
 				} catch(e) {
-					// Will trigger onUsbError or retry
 					setTimeout(attemptReconnect, 2000);
 				}
 			}, 1000);
@@ -957,7 +979,9 @@
 				CurrentLogic = Logic_MT;
 			}
 		
-			CurrentLogic.init();
+			if (CurrentLogic && CurrentLogic.init) {
+				CurrentLogic.init();
+			}
 			updateUIValues();
 		
 			isServerRunning = true;
@@ -967,8 +991,8 @@
 			startUsbHealthCheck();
 		
 			const meterName = meterType.toUpperCase();
-			log(`▶️ Server Started (${meterName})`, 'success');
-			log('📡 Waiting for meter reading request via FT232R...', 'info');
+			log(`▶️ Server Started (${meterName}) via FT232R`, 'success');
+			log('📡 Waiting for meter reading request...', 'info');
 		}
 		
 		function stopServer() {
@@ -984,6 +1008,8 @@
 		
 		function updateServerButton() {
 			const btn = document.getElementById('btnServer');
+			if (!btn) return;
+			
 			btn.classList.remove('ready', 'running');
 		
 			if (!isUsbConnected) {
@@ -1001,6 +1027,8 @@
 			const status = document.getElementById('serverStatus');
 			const text = document.getElementById('serverStatusText');
 			
+			if (!status || !text) return;
+			
 			status.classList.remove('running');
 			
 			if (isServerRunning) {
@@ -1017,16 +1045,20 @@
 		}
 		
 		function updateUIValues() {
-			CurrentLogic.uiValues.serial = document.getElementById('val_serial').value || "0000000";
-			CurrentLogic.uiValues.kwh = parseFloat(document.getElementById('val_kwh').value) || 0;
-			CurrentLogic.uiValues.kvah = parseFloat(document.getElementById('val_kvah').value) || 0;
-			CurrentLogic.uiValues.md_kw = parseFloat(document.getElementById('val_md_kw').value) || 0;
-			CurrentLogic.uiValues.md_kva = parseFloat(document.getElementById('val_md_kva').value) || 0;
+			if (!CurrentLogic || !CurrentLogic.uiValues) return;
+			
+			CurrentLogic.uiValues.serial = document.getElementById('val_serial')?.value || "0000000";
+			CurrentLogic.uiValues.kwh = parseFloat(document.getElementById('val_kwh')?.value) || 0;
+			CurrentLogic.uiValues.kvah = parseFloat(document.getElementById('val_kvah')?.value) || 0;
+			CurrentLogic.uiValues.md_kw = parseFloat(document.getElementById('val_md_kw')?.value) || 0;
+			CurrentLogic.uiValues.md_kva = parseFloat(document.getElementById('val_md_kva')?.value) || 0;
 		}
 		
 		// ========== LOGGING ==========
 		function log(msg, type = '') {
 			const box = document.getElementById('logBox');
+			if (!box) return;
+			
 			const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 			
 			const entry = document.createElement('div');
@@ -1036,14 +1068,14 @@
 			box.appendChild(entry);
 			box.scrollTop = box.scrollHeight;
 			
-			// Keep only last 100 entries
 			while (box.children.length > 100) {
 				box.removeChild(box.firstChild);
 			}
 		}
 		
 		function clearLogs() {
-			document.getElementById('logBox').innerHTML = '';
+			const box = document.getElementById('logBox');
+			if (box) box.innerHTML = '';
 			log('📜 Logs cleared', 'info');
 		}
 		
@@ -1051,15 +1083,15 @@
 		
 		// ✅ USB Connected Successfully
 		function onConnected(message) {
+			log('✅ FT232R USB Connected Successfully callback received', 'success');
 			isUsbConnected = true;
 			isReconnecting = false;
 			reconnectAttempts = 0;
 			updateUsbStatus('connected');
 			updateServerButton();
-			log('✅ FT232R Connected Successfully', 'success');
+			log('✅ FT232R Ready for communication', 'success');
 			
-			// Vibrate on success (if available)
-			try { Android.vibrate(100); } catch(e) {}
+			try { if (Android.vibrate) Android.vibrate(100); } catch(e) {}
 		}
 		
 		// ✅ USB Attached (Plugged in)
@@ -1067,7 +1099,6 @@
 			log('🔌 FT232R USB Cable Detected', 'info');
 			showToast('FT232R Detected - Connecting...', 'success');
 			
-			// Auto connect
 			setTimeout(() => {
 				if (!isUsbConnected) {
 					connectUsb();
@@ -1089,8 +1120,7 @@
 			updateServerStatus();
 			stopUsbHealthCheck();
 			
-			// Vibrate on disconnect
-			try { Android.vibrate(200); } catch(e) {}
+			try { if (Android.vibrate) Android.vibrate(200); } catch(e) {}
 			
 			if (wasRunning) {
 				log('⏹️ Server stopped due to FT232R disconnect', 'warning');
@@ -1102,14 +1132,11 @@
 			log(`❌ FT232R Error: ${errorMessage}`, 'error');
 			
 			if (isUsbConnected && !isReconnecting) {
-				// Connection lost, try to reconnect
 				isUsbConnected = false;
 				attemptReconnect();
 			} else if (isReconnecting) {
-				// Reconnect attempt failed, try again
 				setTimeout(attemptReconnect, 2000);
 			} else {
-				// Initial connection failed
 				updateUsbStatus('disconnected');
 				showToast('FT232R Connection Failed - ' + errorMessage, 'error');
 			}
@@ -1124,12 +1151,15 @@
 		
 		// ✅ Data received from meter reading app
 		function onDataReceived(hexData) {
-			if (!isServerRunning) return;
+			if (!isServerRunning) {
+				log('📦 Data received but server not running', 'info');
+				return;
+			}
 			
-			// Update last data time for health check
 			lastDataTime = Date.now();
+			log(`📨 Data received (${hexData.length} chars)`, 'info');
 		
-			// Detect request type and show simple status
+			// Detect request type
 			if (hexData.includes("935A64")) {
 				log('🔄 Connection request received...', 'info');
 			} else if (hexData.includes("A041034110") || hexData.includes("A044034110")) {
@@ -1151,45 +1181,90 @@
 				log('📊 Reading instant values...', 'info');
 			} else if (hexData.includes("5356A2")) {
 				log('✅ Reading Complete!', 'success');
-				
-				// Vibrate on complete
-				try { Android.vibrate(100); } catch(e) {}
+				try { if (Android.vibrate) Android.vibrate(100); } catch(e) {}
 			}
 		
 			// Process and send response
-			const reply = CurrentLogic.processPacket(hexData);
-			if (reply) {
-				setTimeout(() => {
-					try {
-						Android.sendData(reply);
-					} catch(e) {
-						log('❌ Failed to send response', 'error');
-					}
-				}, 50);
+			if (CurrentLogic && CurrentLogic.processPacket) {
+				const reply = CurrentLogic.processPacket(hexData);
+				if (reply) {
+					log(`📤 Sending response (${reply.length} chars)`, 'info');
+					setTimeout(() => {
+						try {
+							if (typeof Android !== 'undefined' && Android.sendData) {
+								Android.sendData(reply);
+								log('✅ Response sent successfully', 'success');
+							} else {
+								log('❌ Android.sendData not available', 'error');
+							}
+						} catch(e) {
+							log('❌ Failed to send response: ' + e.message, 'error');
+						}
+					}, 50);
+				} else {
+					log('⚠️ No response generated for this packet', 'warning');
+				}
+			} else {
+				log('❌ CurrentLogic or processPacket not available', 'error');
 			}
 		}
 		
 		// General log from Java
 		function onLog(message) {
-			// Filter out technical messages
 			if (message.includes("RX:") || message.includes("TX:")) return;
 			if (message.includes("hex") || message.includes("byte")) return;
 			
 			if (message.includes("error") || message.includes("Error")) {
 				log(`❌ ${message}`, 'error');
+			} else {
+				log(`📱 ${message}`, 'info');
+			}
+		}
+		
+		// ========== SEND DATA FUNCTION (for manual testing) ==========
+		function sendTestData(hexData) {
+			log(`📤 Manual send: ${hexData}`, 'info');
+			try {
+				if (typeof Android !== 'undefined' && Android.sendData) {
+					Android.sendData(hexData);
+				} else {
+					log('❌ Cannot send - Android bridge not available', 'error');
+				}
+			} catch(e) {
+				log('❌ Send failed: ' + e.message, 'error');
 			}
 		}
 		
 		// ========== INIT ==========
-		window.onload = function() {
-			CurrentLogic = Logic;
-			CurrentLogic.init();
+		// Don't use window.onload as it may conflict with other scripts
+		document.addEventListener('DOMContentLoaded', function() {
+			log('🚀 FT232R Web Server Ready', 'success');
+			log('📱 Connect FT232R USB cable to begin', 'info');
+			log('💡 FT232R VID:0403 PID:6001/6015', 'info');
+			
+			if (CurrentLogic && CurrentLogic.init) {
+				CurrentLogic.init();
+			}
 			updateUsbStatus('disconnected');
 			updateServerStatus();
-			initNetGuard();
 			
-			log('🚀 Web Server Ready', 'success');
-			log('📱 Connect FT232R USB cable to begin', 'info');
+			if (typeof initNetGuard === 'function') {
+				initNetGuard();
+			}
+		});
+		
+		// Also handle case when DOM already loaded
+		if (document.readyState === 'loading') {
+			document.addEventListener('DOMContentLoaded', function() {});
+		} else {
+			// DOM already loaded
+			setTimeout(function() {
+				if (typeof CurrentLogic !== 'undefined' && CurrentLogic.init) {
+					CurrentLogic.init();
+				}
+				updateUsbStatus('disconnected');
+				updateServerStatus();
+			}, 100);
 		};
     </script>
 </body>
