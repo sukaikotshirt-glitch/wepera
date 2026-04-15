@@ -3,52 +3,347 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>WEBPERA · USB Meter Reader (CH340/FTDI)</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400..700;1,400..700&display=swap" rel="stylesheet">
+    <title>WEBPERA · USB Meter Reader</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,400..700;1,14..32,400..700&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #f8fafc; font-family: 'Inter', sans-serif; color: #1e293b; }
-        .container { max-width: 720px; margin: 0 auto; padding: 20px 16px 32px; }
-        .app-header { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: white; border-radius: 28px; margin-bottom: 24px; box-shadow: 0 8px 20px -6px rgba(0,0,0,0.05); }
-        .logo { font-weight: 700; font-size: 1.5rem; background: linear-gradient(135deg, #2563eb, #0f2b5e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        .credits-box .total { background: #eef2ff; padding: 6px 14px; border-radius: 40px; font-size: 0.8rem; font-weight: 600; color: #2563eb; }
-        .logout-btn { background: white; border: 1px solid #e2e8f0; padding: 8px 18px; border-radius: 40px; cursor: pointer; }
-        .usb-status-card { background: white; border-radius: 24px; padding: 20px; margin-bottom: 20px; box-shadow: 0 10px 25px -10px rgba(0,0,0,0.1); }
-        .usb-status-row { display: flex; justify-content: space-between; align-items: center; }
-        .usb-status-left { display: flex; align-items: center; gap: 16px; }
-        .usb-dot { width: 14px; height: 14px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 3px #fee2e2; }
-        .usb-dot.connected { background: #22c55e; box-shadow: 0 0 0 3px #dcfce7; }
-        .card { background: white; border-radius: 24px; padding: 24px; margin-bottom: 24px; }
-        .form-group { margin-bottom: 20px; }
-        .form-group label { display: block; font-size: 0.8rem; font-weight: 500; margin-bottom: 6px; }
-        .form-group input, .form-group select { width: 100%; padding: 14px 16px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 20px; font-family: 'Inter', sans-serif; }
-        .row { display: flex; gap: 16px; }
-        .half { flex: 1; }
-        .button-row { display: flex; gap: 16px; margin-bottom: 24px; }
-        .button-row button { flex: 1; padding: 18px 10px; border-radius: 30px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; }
-        .btn-usb { background: #2563eb; color: white; }
-        .btn-usb.connected { background: #22c55e; }
-        .btn-server { background: #e2e8f0; color: #64748b; cursor: default; }
-        .btn-server.ready { background: #2563eb; color: white; cursor: pointer; }
-        .btn-server.running { background: #ef4444; color: white; cursor: pointer; }
-        .log-box { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 20px; padding: 20px; height: 200px; overflow-y: auto; font-family: monospace; font-size: 0.8rem; margin-top: 12px; }
-        .log-entry { padding: 6px 0; border-bottom: 1px solid #e2e8f0; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #f8fafc;
+            font-family: 'Inter', sans-serif;
+            color: #1e293b;
+            line-height: 1.5;
+        }
+
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 20px 16px 32px;
+        }
+
+        .app-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 20px;
+            background: white;
+            border-radius: 28px;
+            box-shadow: 0 8px 20px -6px rgba(0,0,0,0.05);
+            margin-bottom: 24px;
+        }
+
+        .logo {
+            font-weight: 700;
+            font-size: 1.5rem;
+            background: linear-gradient(135deg, #2563eb, #0f2b5e);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .credits-box .total {
+            background: #eef2ff;
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #2563eb;
+        }
+
+        .credits-box .total.critical {
+            background: #fef2f2;
+            color: #b91c1c;
+        }
+
+        .credits-box .daily {
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-top: 4px;
+        }
+
+        .logout-btn {
+            background: white;
+            border: 1px solid #e2e8f0;
+            padding: 8px 18px;
+            border-radius: 40px;
+            cursor: pointer;
+        }
+
+        .usb-status-card {
+            background: white;
+            border-radius: 24px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 25px -10px rgba(0,0,0,0.1);
+        }
+
+        .usb-status-card.connected {
+            box-shadow: 0 10px 25px -8px #22c55e40;
+        }
+
+        .usb-status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .usb-status-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .usb-dot {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: #ef4444;
+            box-shadow: 0 0 0 3px #fee2e2;
+        }
+
+        .usb-dot.connected {
+            background: #22c55e;
+            box-shadow: 0 0 0 3px #dcfce7;
+        }
+
+        .usb-status-text {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .usb-status-sub {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 2px;
+        }
+
+        .usb-signal {
+            background: #f1f5f9;
+            padding: 6px 12px;
+            border-radius: 40px;
+            font-size: 0.7rem;
+        }
+
+        .card {
+            background: white;
+            border-radius: 24px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 8px 25px -12px rgba(0,0,0,0.1);
+        }
+
+        .card h3 {
+            font-weight: 600;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #f1f5f9;
+            padding-bottom: 12px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: #475569;
+            margin-bottom: 6px;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 14px 16px;
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+        }
+
+        .row {
+            display: flex;
+            gap: 16px;
+        }
+
+        .half {
+            flex: 1;
+        }
+
+        .device-selector {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .device-btn {
+            flex: 1;
+            padding: 12px;
+            border-radius: 30px;
+            border: 2px solid #e2e8f0;
+            background: white;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .device-btn.active {
+            border-color: #2563eb;
+            background: #eef2ff;
+            color: #2563eb;
+        }
+
+        .device-btn.ch340.active {
+            border-color: #22c55e;
+            background: #dcfce7;
+            color: #16a34a;
+        }
+
+        .device-btn.ft232r.active {
+            border-color: #2563eb;
+            background: #eef2ff;
+            color: #2563eb;
+        }
+
+        .button-row {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .btn-usb {
+            flex: 1;
+            padding: 18px;
+            border-radius: 30px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-usb.connected {
+            background: #22c55e;
+        }
+
+        .btn-server {
+            flex: 1;
+            padding: 18px;
+            border-radius: 30px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            background: #e2e8f0;
+            color: #64748b;
+        }
+
+        .btn-server.ready {
+            background: #2563eb;
+            color: white;
+        }
+
+        .btn-server.running {
+            background: #ef4444;
+            color: white;
+        }
+
+        .server-status {
+            background: #f8fafc;
+            border-radius: 40px;
+            padding: 16px;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .server-status.running .status-text {
+            color: #22c55e;
+            font-weight: 600;
+        }
+
+        .log-box {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 20px;
+            padding: 20px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 0.75rem;
+            margin-top: 12px;
+        }
+
+        .log-entry {
+            padding: 6px 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
         .log-entry.success { color: #16a34a; }
+        .log-entry.warning { color: #ea580c; }
         .log-entry.error { color: #dc2626; }
+        .log-entry.info { color: #2563eb; }
         .log-entry .time { color: #94a3b8; margin-right: 12px; }
-        .credit-toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: white; padding: 14px 30px; border-radius: 60px; font-weight: 500; box-shadow: 0 20px 35px -10px rgba(0,0,0,0.2); z-index: 1000; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
-        .credit-toast.show { opacity: 1; }
-        .credit-toast.error { background: #ef4444; color: white; }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .btn-small {
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            padding: 6px 16px;
+            border-radius: 40px;
+            cursor: pointer;
+            font-size: 0.7rem;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 12px 24px;
+            border-radius: 60px;
+            box-shadow: 0 20px 35px -10px rgba(0,0,0,0.2);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.2s;
+            pointer-events: none;
+        }
+
+        .toast.show {
+            opacity: 1;
+        }
+
+        .toast.error { background: #ef4444; color: white; }
     </style>
 </head>
 <body>
-    <div class="credit-toast" id="creditToast">💳 Credit Used</div>
+    <div class="toast" id="toast">💳 Credit Used</div>
+
     <div class="container">
         <div class="app-header">
             <div class="logo">WEBPERA</div>
             <div class="user-info">
-                <div class="credits-box"><div class="total" id="creditsDisplay">Credits: 100</div></div>
-                <button class="logout-btn" onclick="logout()">Logout</button>
+                <div class="credits-box">
+                    <div class="total" id="creditsDisplay">Credits: --</div>
+                    <div class="daily" id="dailyDisplay">Today: --/--</div>
+                </div>
+                <button class="logout-btn" id="logoutBtn">Logout</button>
             </div>
         </div>
 
@@ -56,14 +351,30 @@
             <div class="usb-status-row">
                 <div class="usb-status-left">
                     <div class="usb-dot" id="usbDot"></div>
-                    <div><div class="usb-status-text" id="usbStatusText">USB Not Connected</div></div>
+                    <div>
+                        <div class="usb-status-text" id="usbStatusText">No Device Selected</div>
+                        <div class="usb-status-sub" id="usbStatusSub">Select CH340 or FT232R below</div>
+                    </div>
+                </div>
+                <div class="usb-status-right">
+                    <div class="usb-signal" id="usbSignal">—</div>
                 </div>
             </div>
         </div>
 
         <div class="card">
+            <h3>🔌 Select USB Device</h3>
+            <div class="device-selector">
+                <button class="device-btn ch340" id="selectCH340">CH340 / CH341</button>
+                <button class="device-btn ft232r" id="selectFT232R">FT232R (FTDI)</button>
+            </div>
+        </div>
+
+        <div class="card">
             <h3>⚙️ Meter Configuration</h3>
-            <div class="form-group"><label>Meter Profile</label>
+            
+            <div class="form-group">
+                <label>Meter Profile</label>
                 <select id="meterSelect">
                     <option value="avon">Avon Single Phase</option>
                     <option value="avon2">Avon 2 (New Model)</option>
@@ -72,34 +383,61 @@
                     <option value="hpl">HPL Single Phase</option>
                 </select>
             </div>
-            <div class="form-group"><label>Serial No</label><input type="text" id="val_serial" value="9023456"></div>
-            <div class="row"><div class="half"><label>Current kWh</label><input type="number" id="val_kwh" value="1234.5"></div>
-            <div class="half"><label>Current kVAh</label><input type="number" id="val_kvah" value="1300.0"></div></div>
+
+            <div class="form-group">
+                <label>Serial No (Name Plate)</label>
+                <input type="text" id="val_serial" placeholder="e.g. 9023456">
+            </div>
+
+            <div class="row">
+                <div class="form-group half">
+                    <label>Current kWh</label>
+                    <input type="number" id="val_kwh" value="1234.5" step="0.1">
+                </div>
+                <div class="form-group half">
+                    <label>Current kVAh</label>
+                    <input type="number" id="val_kvah" value="1300.0" step="0.1">
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="form-group half">
+                    <label>MD (kW)</label>
+                    <input type="number" id="val_md_kw" value="1.2" step="0.1">
+                </div>
+                <div class="form-group half">
+                    <label>MD (kVA)</label>
+                    <input type="number" id="val_md_kva" value="1.8" step="0.1">
+                </div>
+            </div>
         </div>
 
         <div class="button-row">
-            <button id="btnUsb" class="btn-usb" onclick="connectUSB()">🔌 CONNECT USB</button>
-            <button id="btnServer" class="btn-server" onclick="toggleServer()">▶️ START SERVER</button>
+            <button id="btnUsb" class="btn-usb">🔌 CONNECT USB</button>
+            <button id="btnServer" class="btn-server">▶️ START SERVER</button>
+        </div>
+
+        <div class="server-status" id="serverStatus">
+            <div class="status-text" id="serverStatusText">Server Stopped</div>
         </div>
 
         <div class="card">
-            <div class="log-header"><h3>📄 Status Log</h3><button class="btn-small" onclick="clearLogs()">Clear</button></div>
-            <div id="logBox" class="log-box"><div class="log-entry"><span class="time">[--:--]</span> System Ready. Click Connect USB.</div></div>
+            <div class="log-header">
+                <h3>📄 Status Log</h3>
+                <button class="btn-small" id="clearLogsBtn">Clear</button>
+            </div>
+            <div id="logBox" class="log-box">
+                <div class="log-entry info"><span class="time">[--:--]</span> Select CH340 or FT232R and click CONNECT</div>
+            </div>
         </div>
     </div>
-
-	<!-- Firebase & scripts (keep as is) -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-   <!-- Firebase Config -->
+	<!-- Firebase Config -->
     <script src="js/firebase-config.js"></script>
 
     <!-- Net Guard -->
     <script src="js/net-guard.js"></script>
 
-    <!-- Utils and Logic -->
-    <script src="js/utils.js"></script>
+    <!-- Meter Logic Files -->
     <script src="meters/avon.js"></script>
     <script src="meters/avon2.js"></script>
     <script src="meters/mt_profile.js"></script>
@@ -113,353 +451,560 @@
 
     <!-- Auth Handler -->
     <script src="js/auth.js"></script>
-
-
     <script>
-        // ========== WEBUSB IMPLEMENTATION (REAL USB CONNECTION) ==========
-        let usbDevice = null;
-        let usbInterface = null;
-        let usbEndpointIn = null;
-        let usbEndpointOut = null;
+        // ============================================
+        // COMPLETE CODE FOR BOTH CH340 AND FT232R
+        // BOTH WORK WITH ANDROID BRIDGE
+        // ============================================
+
+        // DOM Elements
+        const elements = {
+            creditsDisplay: document.getElementById('creditsDisplay'),
+            dailyDisplay: document.getElementById('dailyDisplay'),
+            usbStatusCard: document.getElementById('usbStatusCard'),
+            usbDot: document.getElementById('usbDot'),
+            usbStatusText: document.getElementById('usbStatusText'),
+            usbStatusSub: document.getElementById('usbStatusSub'),
+            usbSignal: document.getElementById('usbSignal'),
+            btnUsb: document.getElementById('btnUsb'),
+            btnServer: document.getElementById('btnServer'),
+            serverStatus: document.getElementById('serverStatus'),
+            serverStatusText: document.getElementById('serverStatusText'),
+            logBox: document.getElementById('logBox'),
+            toast: document.getElementById('toast'),
+            meterSelect: document.getElementById('meterSelect'),
+            valSerial: document.getElementById('val_serial'),
+            valKwh: document.getElementById('val_kwh'),
+            valKvah: document.getElementById('val_kvah'),
+            valMdKw: document.getElementById('val_md_kw'),
+            valMdKva: document.getElementById('val_md_kva'),
+            selectCH340: document.getElementById('selectCH340'),
+            selectFT232R: document.getElementById('selectFT232R'),
+            logoutBtn: document.getElementById('logoutBtn'),
+            clearLogsBtn: document.getElementById('clearLogsBtn')
+        };
+
+        // App State
+        let selectedDevice = null; // 'ch340' or 'ft232r'
         let isUsbConnected = false;
         let isServerRunning = false;
-        let reader = null;
-        let keepReading = false;
-        let creditDeductedThisSession = false;
+        let isConnecting = false;
+        let lastDataTime = 0;
+        let healthInterval = null;
+
+        // User Credits (Mock - Replace with Firebase)
         let userCredits = 100;
         let dailyUsed = 0;
         let dailyLimit = 40;
 
-        // CH340 and FTDI USB IDs
-        const CH340_VID = 0x1A86;    // 6790 decimal
-        const CH340_PID = 0x7523;    // 29987 decimal
-        const FTDI_VID = 0x0403;     // 1027 decimal  
-        const FTDI_PID = 0x6001;     // 24577 decimal
-
-        function log(msg, type = '') {
-            const box = document.getElementById('logBox');
-            const time = new Date().toLocaleTimeString();
+        // ============================================
+        // UTILITY FUNCTIONS
+        // ============================================
+        function log(msg, type = 'info') {
+            const box = elements.logBox;
+            const time = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
             const entry = document.createElement('div');
             entry.className = `log-entry ${type}`;
             entry.innerHTML = `<span class="time">[${time}]</span> ${msg}`;
             box.appendChild(entry);
             box.scrollTop = box.scrollHeight;
-        }
-
-        function clearLogs() {
-            document.getElementById('logBox').innerHTML = '';
-            log('Logs cleared', 'info');
-        }
-
-        function updateUSBStatus(connected) {
-            isUsbConnected = connected;
-            const dot = document.getElementById('usbDot');
-            const text = document.getElementById('usbStatusText');
-            const btn = document.getElementById('btnUsb');
-            
-            if (connected) {
-                dot.classList.add('connected');
-                text.textContent = '✅ USB Connected (CH340/FTDI)';
-                btn.textContent = '🔌 DISCONNECT USB';
-                btn.classList.add('connected');
-                btn.setAttribute('onclick', 'disconnectUSB()');
-            } else {
-                dot.classList.remove('connected');
-                text.textContent = '❌ USB Not Connected';
-                btn.textContent = '🔌 CONNECT USB';
-                btn.classList.remove('connected');
-                btn.setAttribute('onclick', 'connectUSB()');
-            }
-        }
-
-        async function connectUSB() {
-            log('🔍 Searching for CH340 or FTDI device...', 'info');
-            
-            try {
-                // Request device with both CH340 and FTDI filters
-                usbDevice = await navigator.usb.requestDevice({
-                    filters: [
-                        { vendorId: CH340_VID, productId: CH340_PID },  // CH340
-                        { vendorId: FTDI_VID, productId: FTDI_PID }      // FTDI
-                    ]
-                });
-                
-                log(`✅ Device found: ${usbDevice.productName || 'USB Serial Adapter'}`, 'success');
-                
-                await usbDevice.open();
-                
-                // Select configuration
-                if (usbDevice.configuration === null) {
-                    await usbDevice.selectConfiguration(1);
-                }
-                
-                // Find the correct interface (usually index 0 or 1 for serial)
-                usbInterface = usbDevice.configuration.interfaces.find(iface => 
-                    iface.alternates.some(alt => alt.interfaceClass === 0xFF || alt.interfaceClass === 0x02)
-                );
-                
-                if (!usbInterface) {
-                    usbInterface = usbDevice.configuration.interfaces[0];
-                }
-                
-                const interfaceNumber = usbInterface.interfaceNumber;
-                await usbDevice.claimInterface(interfaceNumber);
-                
-                // Find endpoints
-                const alt = usbInterface.alternates[0];
-                usbEndpointIn = alt.endpoints.find(ep => ep.direction === 'in');
-                usbEndpointOut = alt.endpoints.find(ep => ep.direction === 'out');
-                
-                if (!usbEndpointIn || !usbEndpointOut) {
-                    throw new Error('Required endpoints not found');
-                }
-                
-                log(`📡 Interface ${interfaceNumber} claimed`, 'success');
-                log(`⬇️ IN endpoint: ${usbEndpointIn.endpointNumber} | ⬆️ OUT endpoint: ${usbEndpointOut.endpointNumber}`, 'info');
-                
-                updateUSBStatus(true);
-                
-                // Start reading data
-                startReading();
-                
-                // Configure serial parameters (baud rate 9600 for meter)
-                await configureSerial(9600);
-                
-                log('📊 USB Serial ready at 9600 baud', 'success');
-                
-            } catch (error) {
-                log(`❌ Connection failed: ${error.message}`, 'error');
-                console.error(error);
-                updateUSBStatus(false);
-            }
-        }
-
-        async function configureSerial(baudRate) {
-            if (!usbDevice) return;
-            
-            try {
-                // CH340 specific control transfer for baud rate
-                // Standard USB CDC ACM control transfer
-                const BAUD_RATE_COMMAND = 0x20; // SET_LINE_CODING
-                const lineCoding = new ArrayBuffer(7);
-                const view = new DataView(lineCoding);
-                view.setUint32(0, baudRate, true);  // baud rate
-                view.setUint8(4, 0);  // stop bits (1)
-                view.setUint8(5, 0);  // parity (none)
-                view.setUint8(6, 8);  // data bits (8)
-                
-                await usbDevice.controlTransferOut({
-                    requestType: 'class',
-                    recipient: 'interface',
-                    request: BAUD_RATE_COMMAND,
-                    value: 0,
-                    index: 0
-                }, lineCoding);
-                
-                log(`⚙️ Baud rate set to ${baudRate}`, 'info');
-            } catch (err) {
-                log(`⚠️ Baud rate config warning: ${err.message}`, 'warning');
-            }
-        }
-
-        async function startReading() {
-            keepReading = true;
-            
-            while (keepReading && usbDevice && isUsbConnected) {
-                try {
-                    const result = await usbDevice.transferIn(usbEndpointIn.endpointNumber, 64);
-                    
-                    if (result.data && result.data.byteLength > 0) {
-                        const bytes = new Uint8Array(result.data.buffer);
-                        const hex = Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
-                        
-                        if (hex.length > 0) {
-                            onDataReceived(hex);
-                        }
-                    }
-                } catch (error) {
-                    if (keepReading) {
-                        log(`⚠️ Read error: ${error.message}`, 'error');
-                    }
-                    break;
-                }
-                
-                await new Promise(resolve => setTimeout(resolve, 10));
-            }
-        }
-
-        async function sendUSBData(hexData) {
-            if (!usbDevice || !isUsbConnected || !usbEndpointOut) {
-                log('❌ Cannot send: USB not connected', 'error');
-                return false;
-            }
-            
-            try {
-                // Convert hex string to bytes
-                const bytes = new Uint8Array(hexData.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
-                await usbDevice.transferOut(usbEndpointOut.endpointNumber, bytes);
-                log(`📤 TX: ${hexData.substring(0, 40)}${hexData.length > 40 ? '...' : ''}`, 'info');
-                return true;
-            } catch (error) {
-                log(`❌ Send failed: ${error.message}`, 'error');
-                return false;
-            }
-        }
-
-        async function disconnectUSB() {
-            keepReading = false;
-            
-            if (usbInterface && usbDevice) {
-                try {
-                    await usbDevice.releaseInterface(usbInterface.interfaceNumber);
-                } catch(e) {}
-            }
-            
-            if (usbDevice) {
-                try {
-                    await usbDevice.close();
-                } catch(e) {}
-            }
-            
-            usbDevice = null;
-            usbInterface = null;
-            usbEndpointIn = null;
-            usbEndpointOut = null;
-            isServerRunning = false;
-            updateUSBStatus(false);
-            updateServerButton();
-            log('🔌 USB Disconnected', 'warning');
-        }
-
-        // ========== METER LOGIC (Simplified but functional) ==========
-        function processPacket(hexData) {
-            // Simulate meter response based on request type
-            if (hexData.includes("0201020204")) {
-                // Billing data request - deduct credit
-                if (!creditDeductedThisSession) {
-                    deductCredit();
-                    creditDeductedThisSession = true;
-                }
-                // Return simulated meter data
-                return "A0FF0102030405060708090A0B0C0D0E0F";
-            }
-            
-            if (hexData.includes("0100010800")) {
-                // Clock read request
-                return "A0FF" + new Date().getTime().toString(16).substring(0, 16);
-            }
-            
-            if (hexData.includes("0100600100")) {
-                // Serial number request
-                const serial = document.getElementById('val_serial').value || "9023456";
-                return "A0FF" + Array.from(serial).map(c => c.charCodeAt(0).toString(16)).join('').substring(0, 20);
-            }
-            
-            return null;
-        }
-
-        function onDataReceived(hexData) {
-            if (!isServerRunning) return;
-            
-            // Log received data (shortened)
-            if (hexData.includes("0201020204")) {
-                log('📊 Billing data request received - processing...', 'info');
-                deductCredit();
-            } else if (hexData.includes("5356A2")) {
-                log('✅ Reading Complete!', 'success');
-            } else if (hexData.length > 4) {
-                log(`📥 RX: ${hexData.substring(0, 30)}${hexData.length > 30 ? '...' : ''}`, 'info');
-            }
-            
-            const reply = processPacket(hexData);
-            if (reply) {
-                setTimeout(() => sendUSBData(reply), 50);
-            }
-        }
-
-        // ========== CREDIT SYSTEM ==========
-        function updateCreditsDisplay() {
-            document.getElementById('creditsDisplay').textContent = `Credits: ${userCredits}`;
+            while (box.children.length > 100) box.removeChild(box.firstChild);
         }
 
         function showToast(message, type = 'success') {
-            const toast = document.getElementById('creditToast');
+            const toast = elements.toast;
             toast.textContent = message;
-            toast.classList.toggle('error', type === 'error');
+            toast.classList.remove('error');
+            if (type === 'error') toast.classList.add('error');
             toast.classList.add('show');
             setTimeout(() => toast.classList.remove('show'), 3000);
         }
 
-        async function deductCredit() {
-            if (userCredits <= 0) {
-                log('❌ Credits exhausted!', 'error');
-                showToast('Credits exhausted!', 'error');
-                return false;
-            }
-            
-            if (dailyUsed >= dailyLimit) {
-                log('❌ Daily limit reached!', 'error');
-                showToast('Daily limit reached!', 'error');
-                return false;
-            }
-            
-            userCredits--;
-            dailyUsed++;
-            updateCreditsDisplay();
-            log(`💳 Credit deducted | Today: ${dailyUsed}/${dailyLimit} | Remaining: ${userCredits}`, 'credit');
-            showToast(`💳 Credit used! Remaining: ${userCredits}`);
-            return true;
+        function updateCreditsDisplay() {
+            elements.creditsDisplay.textContent = `Credits: ${userCredits}`;
+            if (userCredits <= 10) elements.creditsDisplay.classList.add('critical');
+            elements.dailyDisplay.textContent = `Today: ${dailyUsed}/${dailyLimit}`;
         }
 
-        function logout() {
+        // ============================================
+        // USB STATUS UI
+        // ============================================
+        function updateUsbStatus(status) {
+            const card = elements.usbStatusCard;
+            const dot = elements.usbDot;
+            const btn = elements.btnUsb;
+            const text = elements.usbStatusText;
+            const sub = elements.usbStatusSub;
+
+            card.classList.remove('connected');
+            dot.classList.remove('connected');
+            btn.classList.remove('connected');
+
+            if (status === 'connected') {
+                card.classList.add('connected');
+                dot.classList.add('connected');
+                btn.classList.add('connected');
+                btn.textContent = '🔌 DISCONNECT USB';
+                
+                if (selectedDevice === 'ft232r') {
+                    text.textContent = '✅ FT232R Connected';
+                    sub.textContent = 'FTDI FT232R • Ready for reading';
+                } else {
+                    text.textContent = '✅ CH340 Connected';
+                    sub.textContent = 'CH340 Serial • Ready for reading';
+                }
+            } else if (status === 'connecting') {
+                btn.textContent = '⏳ CONNECTING...';
+                text.textContent = '🔌 Connecting...';
+                sub.textContent = 'Please wait';
+            } else {
+                btn.textContent = '🔌 CONNECT USB';
+                if (selectedDevice === 'ft232r') {
+                    text.textContent = '❌ FT232R Not Connected';
+                    sub.textContent = 'Select FT232R and click CONNECT';
+                } else if (selectedDevice === 'ch340') {
+                    text.textContent = '❌ CH340 Not Connected';
+                    sub.textContent = 'Select CH340 and click CONNECT';
+                } else {
+                    text.textContent = '❌ No Device Selected';
+                    sub.textContent = 'Select CH340 or FT232R below';
+                }
+            }
+        }
+
+        function updateServerButton() {
+            const btn = elements.btnServer;
+            btn.classList.remove('ready', 'running');
+
+            if (!isUsbConnected || !selectedDevice) {
+                btn.textContent = '▶️ START SERVER';
+                btn.disabled = true;
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+            } else if (isServerRunning) {
+                btn.textContent = '⏹️ STOP SERVER';
+                btn.classList.add('running');
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            } else {
+                btn.textContent = '▶️ START SERVER';
+                btn.classList.add('ready');
+                btn.disabled = false;
+                btn.style.opacity = '1';
+            }
+        }
+
+        function updateServerStatus() {
+            if (isServerRunning) {
+                elements.serverStatus.classList.add('running');
+                elements.serverStatusText.textContent = '🟢 Server Running - Ready for Reading';
+            } else {
+                elements.serverStatus.classList.remove('running');
+                elements.serverStatusText.textContent = 'Server Stopped';
+            }
+        }
+
+        function updateDeviceSelection() {
+            if (selectedDevice === 'ch340') {
+                elements.selectCH340.classList.add('active');
+                elements.selectFT232R.classList.remove('active');
+                elements.selectCH340.style.borderColor = '#22c55e';
+                elements.selectCH340.style.background = '#dcfce7';
+            } else if (selectedDevice === 'ft232r') {
+                elements.selectFT232R.classList.add('active');
+                elements.selectCH340.classList.remove('active');
+                elements.selectFT232R.style.borderColor = '#2563eb';
+                elements.selectFT232R.style.background = '#eef2ff';
+            } else {
+                elements.selectCH340.classList.remove('active');
+                elements.selectFT232R.classList.remove('active');
+                elements.selectCH340.style.borderColor = '#e2e8f0';
+                elements.selectCH340.style.background = 'white';
+                elements.selectFT232R.style.borderColor = '#e2e8f0';
+                elements.selectFT232R.style.background = 'white';
+            }
+        }
+
+        // ============================================
+        // METER DATA PROCESSING
+        // ============================================
+        function processMeterData(hexData) {
+            if (!hexData || hexData.length === 0) return null;
+            
+            log(`📊 Processing: ${hexData.substring(0, 40)}...`, 'info');
+            
+            // Credit deduction on billing data request
+            if (hexData.includes("0201020204")) {
+                if (userCredits > 0 && dailyUsed < dailyLimit) {
+                    userCredits--;
+                    dailyUsed++;
+                    updateCreditsDisplay();
+                    log(`💳 Credit deducted! Remaining: ${userCredits}`, 'credit');
+                    showToast(`Credit Used! Remaining: ${userCredits}`);
+                } else if (userCredits <= 0) {
+                    log('❌ No credits remaining! Please recharge.', 'error');
+                    showToast('No credits remaining!', 'error');
+                    stopServer();
+                }
+            }
+            
+            // Return mock response (replace with actual meter logic)
+            if (hexData.includes("0100010800")) {
+                // Clock reading response
+                return "A0" + hexData.substring(2, 6) + "240412153000FF";
+            } else if (hexData.includes("0100600100")) {
+                // Serial number response
+                const serial = elements.valSerial.value || "0000000";
+                return "A0" + hexData.substring(2, 6) + serial.padStart(14, '0') + "FF";
+            } else if (hexData.includes("0201020204")) {
+                // Billing data response
+                const kwh = (parseFloat(elements.valKwh.value) || 1234.5).toFixed(1);
+                const kvah = (parseFloat(elements.valKvah.value) || 1300.0).toFixed(1);
+                return "A0" + hexData.substring(2, 6) + "0000" + kwh.replace('.', '') + kvah.replace('.', '') + "FF";
+            }
+            
+            return "A0" + hexData.substring(2, 6) + "00FF";
+        }
+
+        // ============================================
+        // ANDROID BRIDGE FUNCTIONS
+        // ============================================
+        function isAndroidBridgeAvailable() {
+            return typeof window.Android !== 'undefined';
+        }
+
+        function connectCH340() {
+            if (!isAndroidBridgeAvailable()) {
+                log('❌ Android Bridge not available!', 'error');
+                showToast('Android Bridge not available', 'error');
+                return false;
+            }
+            
+            try {
+                if (typeof window.Android.connectCH340 === 'function') {
+                    window.Android.connectCH340();
+                } else if (typeof window.Android.connectUSB === 'function') {
+                    window.Android.connectUSB();
+                } else {
+                    throw new Error('No USB connect method found');
+                }
+                log('🔌 Connecting CH340...', 'info');
+                return true;
+            } catch(e) {
+                log(`❌ CH340 connect error: ${e.message}`, 'error');
+                return false;
+            }
+        }
+
+        function connectFT232R() {
+            if (!isAndroidBridgeAvailable()) {
+                log('❌ Android Bridge not available!', 'error');
+                showToast('Android Bridge not available', 'error');
+                return false;
+            }
+            
+            try {
+                if (typeof window.Android.connectFT232R === 'function') {
+                    window.Android.connectFT232R();
+                } else if (typeof window.Android.connectUSB === 'function') {
+                    window.Android.connectUSB();
+                } else {
+                    throw new Error('No USB connect method found');
+                }
+                log('🔌 Connecting FT232R...', 'info');
+                return true;
+            } catch(e) {
+                log(`❌ FT232R connect error: ${e.message}`, 'error');
+                return false;
+            }
+        }
+
+        function disconnectUSB() {
+            if (!isAndroidBridgeAvailable()) return;
+            
+            try {
+                if (typeof window.Android.disconnect === 'function') {
+                    window.Android.disconnect();
+                }
+            } catch(e) {}
+        }
+
+        function sendUSBData(data) {
+            if (!isAndroidBridgeAvailable() || !isUsbConnected) return false;
+            
+            try {
+                if (typeof window.Android.sendData === 'function') {
+                    window.Android.sendData(data);
+                    return true;
+                }
+            } catch(e) {
+                log(`❌ Send error: ${e.message}`, 'error');
+            }
+            return false;
+        }
+
+        // ============================================
+        // MAIN CONNECTION HANDLERS
+        // ============================================
+        async function connectUsb() {
+            if (isUsbConnected) {
+                disconnectUsb();
+                return;
+            }
+            
+            if (!selectedDevice) {
+                log('⚠️ Please select a device first (CH340 or FT232R)', 'warning');
+                showToast('Select CH340 or FT232R first!', 'error');
+                return;
+            }
+            
+            if (isConnecting) {
+                log('⏳ Connection already in progress...', 'warning');
+                return;
+            }
+            
+            isConnecting = true;
+            updateUsbStatus('connecting');
+            
+            let success = false;
+            
+            if (selectedDevice === 'ch340') {
+                success = connectCH340();
+            } else if (selectedDevice === 'ft232r') {
+                success = connectFT232R();
+            }
+            
+            // Simulate connection response (actual connection will be via Android callbacks)
+            setTimeout(() => {
+                if (isConnecting && !isUsbConnected) {
+                    log('⚠️ Connection timeout. Make sure USB device is connected.', 'warning');
+                    updateUsbStatus('disconnected');
+                    isConnecting = false;
+                }
+            }, 5000);
+        }
+
+        function disconnectUsb() {
+            if (isServerRunning) {
+                stopServer();
+            }
+            
+            if (healthInterval) {
+                clearInterval(healthInterval);
+                healthInterval = null;
+            }
+            
             disconnectUSB();
-            window.location.href = 'index.html';
+            isUsbConnected = false;
+            isConnecting = false;
+            updateUsbStatus('disconnected');
+            updateServerButton();
+            log('🔌 USB Disconnected', 'warning');
         }
 
-        // ========== SERVER CONTROLS ==========
-        function toggleServer() {
+        // ============================================
+        // SERVER FUNCTIONS
+        // ============================================
+        function startServer() {
             if (!isUsbConnected) {
                 log('⚠️ Please connect USB first!', 'warning');
                 showToast('Connect USB first!', 'error');
                 return;
             }
             
-            isServerRunning = !isServerRunning;
-            updateServerButton();
+            if (userCredits <= 0) {
+                log('❌ No credits remaining!', 'error');
+                showToast('Please recharge credits', 'error');
+                return;
+            }
             
+            isServerRunning = true;
+            updateServerButton();
+            updateServerStatus();
+            log(`▶️ Server Started (${selectedDevice?.toUpperCase()}) - Ready for meter reading`, 'success');
+            showToast('Server Started!');
+            
+            // Start health check
+            lastDataTime = Date.now();
+            healthInterval = setInterval(() => {
+                if (isServerRunning && isUsbConnected) {
+                    const timeSince = Date.now() - lastDataTime;
+                    const signal = elements.usbSignal;
+                    if (timeSince < 5000) {
+                        signal.textContent = '● Active';
+                        signal.style.color = '#00e676';
+                    } else if (timeSince < 15000) {
+                        signal.textContent = '● Idle';
+                        signal.style.color = '#888';
+                    } else {
+                        signal.textContent = '● Waiting';
+                        signal.style.color = '#ff9800';
+                    }
+                }
+            }, 2000);
+        }
+
+        function stopServer() {
+            isServerRunning = false;
+            if (healthInterval) {
+                clearInterval(healthInterval);
+                healthInterval = null;
+            }
+            updateServerButton();
+            updateServerStatus();
+            log('⏹️ Server Stopped', 'warning');
+        }
+
+        // ============================================
+        // ANDROID BRIDGE CALLBACKS
+        // ============================================
+        window.onConnected = function(deviceType) {
+            log(`✅ ${deviceType || selectedDevice?.toUpperCase()} Connected via Android Bridge!`, 'success');
+            isUsbConnected = true;
+            isConnecting = false;
+            
+            // Auto-detect device type from callback if available
+            if (deviceType === 'FT232R' || deviceType === 'ft232r') {
+                selectedDevice = 'ft232r';
+                updateDeviceSelection();
+            } else if (deviceType === 'CH340' || deviceType === 'ch340') {
+                selectedDevice = 'ch340';
+                updateDeviceSelection();
+            }
+            
+            updateUsbStatus('connected');
+            updateServerButton();
+            showToast(`${selectedDevice?.toUpperCase()} Connected!`);
+            
+            try { if (window.Android?.vibrate) window.Android.vibrate(100); } catch(e) {}
+        };
+        
+        window.onUsbAttached = function(deviceType) {
+            log(`🔌 USB device attached: ${deviceType || 'Unknown'}`, 'info');
+            if (!isUsbConnected && selectedDevice) {
+                connectUsb();
+            }
+        };
+        
+        window.onUsbDetached = function() {
+            log('⚠️ USB device detached!', 'error');
+            showToast('USB Disconnected!', 'error');
+            disconnectUsb();
+        };
+        
+        window.onUsbError = function(error) {
+            log(`❌ USB Error: ${error}`, 'error');
+            isConnecting = false;
+            updateUsbStatus('disconnected');
+            showToast(`USB Error: ${error}`, 'error');
+        };
+        
+        window.onDataReceived = function(hexData) {
+            if (!isServerRunning) return;
+            
+            lastDataTime = Date.now();
+            
+            // Log different types of requests
+            if (hexData.includes("935A64")) {
+                log('🔄 Connection request received', 'info');
+            } else if (hexData.includes("A041034110")) {
+                log('🔐 Authentication request', 'info');
+            } else if (hexData.includes("0100010800")) {
+                log('⏰ Reading meter clock...', 'info');
+            } else if (hexData.includes("0100600100")) {
+                log('🔢 Reading serial number...', 'info');
+            } else if (hexData.includes("0201020204")) {
+                log('📊 Reading billing data...', 'info');
+            } else if (hexData.includes("0100010700")) {
+                log('⚡ Reading instant values...', 'info');
+            } else if (hexData.includes("5356A2")) {
+                log('✅ Reading complete!', 'success');
+                try { if (window.Android?.vibrate) window.Android.vibrate(100); } catch(e) {}
+            }
+            
+            const reply = processMeterData(hexData);
+            if (reply) {
+                setTimeout(() => {
+                    sendUSBData(reply);
+                }, 50);
+            }
+        };
+        
+        window.onLog = function(message) {
+            if (message && !message.includes('RX:') && !message.includes('TX:') && !message.includes('hex')) {
+                log(message, 'info');
+            }
+        };
+
+        // ============================================
+        // EVENT LISTENERS
+        // ============================================
+        elements.selectCH340.addEventListener('click', () => {
+            if (isUsbConnected) {
+                log('⚠️ Disconnect USB before changing device', 'warning');
+                return;
+            }
+            selectedDevice = 'ch340';
+            updateDeviceSelection();
+            updateUsbStatus('disconnected');
+            log('📟 CH340/CH341 selected', 'info');
+        });
+        
+        elements.selectFT232R.addEventListener('click', () => {
+            if (isUsbConnected) {
+                log('⚠️ Disconnect USB before changing device', 'warning');
+                return;
+            }
+            selectedDevice = 'ft232r';
+            updateDeviceSelection();
+            updateUsbStatus('disconnected');
+            log('📟 FT232R (FTDI) selected', 'info');
+        });
+        
+        elements.btnUsb.addEventListener('click', connectUsb);
+        
+        elements.btnServer.addEventListener('click', () => {
             if (isServerRunning) {
-                creditDeductedThisSession = false;
-                log('▶️ Server Started - Waiting for meter reading...', 'success');
+                stopServer();
             } else {
-                log('⏹️ Server Stopped', 'warning');
+                startServer();
+            }
+        });
+        
+        elements.logoutBtn.addEventListener('click', () => {
+            log('👋 Logging out...', 'info');
+            disconnectUsb();
+            stopServer();
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 500);
+        });
+        
+        elements.clearLogsBtn.addEventListener('click', () => {
+            elements.logBox.innerHTML = '';
+            log('📜 Logs cleared', 'info');
+        });
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+        function init() {
+            updateCreditsDisplay();
+            updateUsbStatus('disconnected');
+            updateServerStatus();
+            updateDeviceSelection();
+            log('🚀 WEBPERA Ready!', 'success');
+            log('📱 Select CH340 or FT232R and click CONNECT USB', 'info');
+            
+            // Auto-detect if Android Bridge is available
+            if (isAndroidBridgeAvailable()) {
+                log('✅ Android Bridge detected', 'success');
+            } else {
+                log('⚠️ Android Bridge not detected. Make sure you are running in WebView.', 'warning');
             }
         }
-
-        function updateServerButton() {
-            const btn = document.getElementById('btnServer');
-            if (!isUsbConnected) {
-                btn.textContent = '▶️ START SERVER';
-                btn.classList.remove('ready', 'running');
-                btn.classList.add('btn-server');
-            } else if (isServerRunning) {
-                btn.textContent = '⏹️ STOP SERVER';
-                btn.classList.remove('ready');
-                btn.classList.add('running');
-            } else {
-                btn.textContent = '▶️ START SERVER';
-                btn.classList.remove('running');
-                btn.classList.add('ready');
-            }
-        }
-
-        // Check WebUSB support
-        if (!navigator.usb) {
-            log('❌ WebUSB not supported! Please use Chrome/Edge browser.', 'error');
-            document.getElementById('btnUsb').disabled = true;
-            document.getElementById('btnUsb').style.opacity = '0.5';
-        } else {
-            log('✅ WebUSB supported. Click Connect USB and select your CH340/FTDI device.', 'success');
-        }
+        
+        init();
     </script>
 </body>
 </html>
