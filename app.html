@@ -597,7 +597,7 @@
         let isReconnecting = false;
         let currentUser = null;
         let userCredits = 0;
-        let dailyLimit = 40;
+        let dailyLimit = 30;
         let dailyUsed = 0;
         let lastResetDate = "";
         let creditDeductedThisSession = false;
@@ -641,7 +641,7 @@
                 if (doc.exists) {
                     const data = doc.data();
                     userCredits = data.credits || 0;
-                    dailyLimit = data.dailyLimit || 40;
+                    dailyLimit = data.dailyLimit || 30;
                     dailyUsed = data.dailyUsed || 0;
                     lastResetDate = data.lastResetDate || "";
 
@@ -824,7 +824,7 @@
                     dot.classList.add('connected');
                     btn.classList.add('connected');
                     text.textContent = '✅ USB Connected';
-                    sub.textContent = 'CH340 Serial • 9600 baud';
+                    sub.textContent = 'FT232R USB UART Serial • 9600 baud';
                     signal.textContent = '● Strong';
                     signal.style.color = '#00e676';
                     btn.textContent = '🔌 DISCONNECT USB';
